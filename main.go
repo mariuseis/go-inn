@@ -144,6 +144,12 @@ const (
 	ModeGameOver
 )
 
+type Platform struct {
+	x0 int
+	y0 int
+	tileCount int
+}
+
 type Game struct {
 	mode Mode
 
@@ -323,6 +329,8 @@ func (g *Game) Update() error {
 func (g *Game) Draw(screen *ebiten.Image) {
 	screen.Fill(color.RGBA{0x80, 0xa0, 0xc0, 0xff}) //background color
 	g.drawTiles(screen)
+	platform := Platform{x0: 400, y0: 200, tileCount: 10}
+	g.drawPlatforms(screen, []Platform{platform})
 	if g.mode != ModeTitle {
 		g.drawGopher(screen)
 		g.drawEnemy(screen)
@@ -422,6 +430,18 @@ func (g *Game) hit() bool {
 	return false
 }
 
+func (g *Game) drawPlatforms(screen *ebiten.Image, platforms []Platform){
+	op := &ebiten.DrawImageOptions{}
+
+	for _, platform := range platforms {
+		for i := 0; i < platform.tileCount; i++ {
+			op.GeoM.Reset()
+			op.GeoM.Translate(float64(platform.x0 + tileSize * i + (g.cameraX - g.x16)/15), float64(platform.y0))
+			screen.DrawImage(tilesImage.SubImage(image.Rect(0, 290, tileSize, 290 + tileSize)).(*ebiten.Image), op)
+		}
+	}
+}
+
 func (g *Game) drawTiles(screen *ebiten.Image) {
 	const (
 		nx           = screenWidth / tileSize
@@ -431,13 +451,14 @@ func (g *Game) drawTiles(screen *ebiten.Image) {
 	)
 
 	op := &ebiten.DrawImageOptions{}
+
 	for i := -2; i < nx+1; i++ {
 		// ground
 		op.GeoM.Reset()
 		op.GeoM.Translate(float64(i*tileSize-floorMod(g.cameraX, tileSize)),
 			float64((ny-1)*tileSize-floorMod(g.cameraY, tileSize)))
 		screen.DrawImage(tilesImage.SubImage(image.Rect(0, 0, tileSize, tileSize)).(*ebiten.Image), op)
-
+		
 		// pipe
 		if tileY, ok := g.pipeAt(floorDiv(g.cameraX, tileSize) + i); ok {
 			for j := 0; j < tileY; j++ {
