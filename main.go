@@ -138,6 +138,10 @@ type Game struct {
 	x16  int
 	y16  int
 	vy16 int
+	vx16 int
+
+	isMovingRight bool
+	isMovingLeft bool
 
 	// Camera
 	cameraX int
@@ -165,6 +169,7 @@ func NewGame() *Game {
 func (g *Game) init() {
 	g.x16 = 0
 	g.y16 = 100 * 16
+	g.isMovingRight = false
 	g.cameraX = -240
 	g.cameraY = 0
 	g.pipeTileYs = make([]int, 256)
@@ -202,29 +207,34 @@ func (g *Game) isKeyJustPressed() bool {
 	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
 		return true
 	}
-	// g.touchIDs = inpututil.AppendJustPressedTouchIDs(g.touchIDs)
-	// if len(g.touchIDs) > 0 {
-	// 	return true
-	// }
-	// g.gamepadIDs = ebiten.AppendGamepadIDs(g.gamepadIDs[:0])
-	// for _, g := range g.gamepadIDs {
-	// 	if ebiten.IsStandardGamepadLayoutAvailable(g) {
-	// 		if inpututil.IsStandardGamepadButtonJustPressed(g, ebiten.StandardGamepadButtonRightBottom) {
-	// 			return true
-	// 		}
-	// 		if inpututil.IsStandardGamepadButtonJustPressed(g, ebiten.StandardGamepadButtonRightRight) {
-	// 			return true
-	// 		}
-	// 	} else {
-	// 		// The button 0/1 might not be A/B buttons.
-	// 		if inpututil.IsGamepadButtonJustPressed(g, ebiten.GamepadButton0) {
-	// 			return true
-	// 		}
-	// 		if inpututil.IsGamepadButtonJustPressed(g, ebiten.GamepadButton1) {
-	// 			return true
-	// 		}
-	// 	}
-	// }
+	return false
+}
+
+func (g *Game) isRightKeyJustPressed() bool {
+	if inpututil.IsKeyJustPressed(ebiten.KeyD) {
+		return true
+	}
+	return false
+}
+
+func (g *Game) isRightKeyJustReleased() bool {
+	if inpututil.IsKeyJustReleased(ebiten.KeyD) {
+		return true
+	}
+	return false
+}
+
+func (g *Game) isLeftKeyJustPressed() bool {
+	if inpututil.IsKeyJustPressed(ebiten.KeyA) {
+		return true
+	}
+	return false
+}
+
+func (g *Game) isLeftKeyJustReleased() bool {
+	if inpututil.IsKeyJustReleased(ebiten.KeyA) {
+		return true
+	}
 	return false
 }
 
@@ -239,17 +249,45 @@ func (g *Game) Update() error {
 			g.mode = ModeGame
 		}
 	case ModeGame:
-		g.x16 += 32
-		g.cameraX += 2
+		//g.x16 += 32
+		//g.cameraX += 2
 		if g.isKeyJustPressed() {
-			g.vy16 = -96
+			g.vy16 = -12
 			// g.jumpPlayer.Rewind()
 			// g.jumpPlayer.Play()
 		}
+
+		if g.isRightKeyJustPressed() {
+			g.isMovingRight = true
+			g.isMovingLeft = false
+		}
+		if g.isLeftKeyJustPressed() {
+			g.isMovingLeft = true
+			g.isMovingRight = false
+		}
+		if g.isRightKeyJustReleased() || g.isLeftKeyJustReleased() {
+			g.isMovingRight = false
+			g.isMovingLeft = false
+			g.vx16 = 0
+		}
+
+		if g.isMovingRight {
+			g.vx16 += 10
+		}
+		if g.isMovingLeft {
+			g.vx16 -= 10
+		}
+		if g.vx16 > 50 {
+			g.vx16 = 50
+		} else if g.vx16 < -50 {
+			g.vx16 = -50
+		}
+
+		g.x16 += g.vx16
 		g.y16 += g.vy16
 
 		// Gravity
-		g.vy16 += 4
+		// g.vy16 += 4
 		if g.vy16 > 96 {
 			g.vy16 = 96
 		}
