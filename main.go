@@ -64,7 +64,7 @@ const (
 	fontSize         = 24
 	smallFontSize    = fontSize / 2
 	pipeWidth        = tileSize * 2
-	pipeStartOffsetX = 8
+	pipeStartOffsetX = -1
 	pipeIntervalX    = 8
 	pipeGapY         = 5
 )
@@ -302,10 +302,17 @@ func (g *Game) Update() error {
 		}
 
 		if g.hit() {
+			// fmt.Printf("it is hit")
 			// g.hitPlayer.Rewind()
 			// g.hitPlayer.Play()
 			//g.mode = ModeGameOver
 			//g.gameoverCount = 30
+			//g.vy16 = 0
+			// g.vx16 = 0
+			// fmt.Print("-----PIPE-----")
+		}
+
+		if g.groundTouch() {
 			g.vy16 = 0
 		}
 	case ModeGameOver:
@@ -396,9 +403,6 @@ func (g *Game) hit() bool {
 	if y0 < -tileSize*4 {
 		return true
 	}
-	if y1 >= screenHeight-tileSize {
-		return true
-	}
 	xMin := floorDiv(x0-pipeWidth, tileSize)
 	xMax := floorDiv(x0+gopherWidth, tileSize)
 	for x := xMin; x <= xMax; x++ {
@@ -419,6 +423,21 @@ func (g *Game) hit() bool {
 			return true
 		}
 	}
+	return false
+}
+
+func (g *Game) groundTouch() bool {
+	const gopherHeight = 60
+	_, h := gopherImage.Size()
+
+	y0 := floorDiv(g.y16, 16) + (h-gopherHeight)/2
+	y1 := y0 + gopherHeight
+
+	if y1 >= screenHeight-tileSize {
+		// fmt.Printf("---ground---")
+		return true
+	}
+
 	return false
 }
 
