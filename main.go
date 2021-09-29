@@ -242,6 +242,28 @@ func (g *Game) isLeftKeyJustReleased() bool {
 	return false
 }
 
+func (g *Game) isKeyPressed(keys []ebiten.Key) bool{
+	keyMap := make(map[ebiten.Key]int)
+	for _, key := range keys {
+		keyMap[key] = -1
+	}
+	for _, v := range inpututil.PressedKeys() {
+		if keyMap[v] == -1 {
+			keyMap[v] = 1
+		}
+	}
+	for _, v := range keyMap {
+		if (v == -1) {
+			return false
+		} 
+	}
+	return true
+}
+
+func (g *Game) isRestartJustPressed() bool {
+	return g.isKeyPressed([]ebiten.Key{ebiten.KeyControlLeft, ebiten.KeyR})
+}
+
 func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 	return screenWidth, screenHeight
 }
@@ -273,6 +295,9 @@ func (g *Game) Update() error {
 			g.isMovingRight = false
 			g.isMovingLeft = false
 			g.vx16 = 0
+		}
+		if g.isRestartJustPressed(){
+			g.mode = ModeGameOver
 		}
 
 		if g.isMovingRight {
