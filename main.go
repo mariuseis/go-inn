@@ -79,7 +79,7 @@ var (
 	arcadeFont      font.Face
 	smallArcadeFont font.Face
 )
-func loadImage
+
 //asset image declarations
 func init() {
 	// 1. create const "img" and use Gopher_png from resources
@@ -92,7 +92,7 @@ func init() {
 	gopherImage = ebiten.NewImageFromImage(img)
 
 	// All 3 main steps are repeated for other images, in this case -> floor tiles
-	img, _, err := image.Decode(bytes.NewReader(resources.Tiles_png))
+	img, _, err = image.Decode(bytes.NewReader(resources.Tiles_png))
 	if err != nil {
 		log.Fatal(err)
 	}
