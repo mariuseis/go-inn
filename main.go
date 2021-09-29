@@ -161,6 +161,7 @@ type Game struct {
 	pipeTileYs []int
 
 	gameoverCount int
+	jumpCount int
 
 	touchIDs   []ebiten.TouchID
 	gamepadIDs []ebiten.GamepadID
@@ -185,6 +186,7 @@ func (g *Game) init() {
 	for i := range g.pipeTileYs {
 		g.pipeTileYs[i] = rand.Intn(6) + 2
 	}
+	g.jumpCount = 0
 
 	// if g.audioContext == nil {
 	// 	g.audioContext = audio.NewContext(48000)
@@ -282,9 +284,14 @@ func (g *Game) Update() error {
 		//g.x16 += 32
 		//g.cameraX += 2
 		if g.isKeyJustPressed() {
-			if(g.y16 > 5000) { // if y position of Gopher is higher than 5000 then stop changing position (initial is 6100)
-				g.vy16 = -80 // on jump change position by -80
-			}
+			// not more than 2 jumps
+			// allow jump from collision/platforms
+			if(g.jumpCount < 2) {
+				g.vy16 = -80
+				g.jumpCount++
+			} else if(g.hit() || g.groundTouch()) {
+				g.jumpCount = 0
+			} 
 			// g.jumpPlayer.Rewind()
 			// g.jumpPlayer.Play()
 		}
