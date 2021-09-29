@@ -153,9 +153,6 @@ type Game struct {
 	vy16 int
 	vx16 int
 
-	isMovingRight bool
-	isMovingLeft bool
-
 	// Camera
 	cameraX int
 	cameraY int
@@ -182,7 +179,6 @@ func NewGame() *Game {
 func (g *Game) init() {
 	g.x16 = 0
 	g.y16 = 100 * 16
-	g.isMovingRight = false
 	g.cameraX = -240
 	g.cameraY = 0
 	g.pipeTileYs = make([]int, 256)
@@ -223,32 +219,29 @@ func (g *Game) isKeyJustPressed() bool {
 	return false
 }
 
-func (g *Game) isRightKeyJustPressed() bool {
-	if inpututil.IsKeyJustPressed(ebiten.KeyD) {
-		return true
-	}
-	return false
-}
+func (g *Game) handleMovement() {
+	isLeftPressed := g.isKeyPressed([]ebiten.Key{ebiten.KeyA}) || g.isKeyPressed([]ebiten.Key{ebiten.KeyArrowLeft})
+	isRightPressed := g.isKeyPressed([]ebiten.Key{ebiten.KeyD}) || g.isKeyPressed([]ebiten.Key{ebiten.KeyArrowRight})
+	areBothPressed := g.isKeyPressed([]ebiten.Key{ebiten.KeyA, ebiten.KeyD}) || g.isKeyPressed([]ebiten.Key{ebiten.KeyArrowLeft, ebiten.KeyArrowRight})
 
-func (g *Game) isRightKeyJustReleased() bool {
-	if inpututil.IsKeyJustReleased(ebiten.KeyD) {
-		return true
+	if (areBothPressed) {
+		g.vx16 = 0;
+	} else if (isLeftPressed) {
+		g.vx16 -= 10
+		if(g.vx16 < -50) {
+			g.vx16 = -50
+		}
+	} else if (isRightPressed) {
+		g.vx16 += 10
+		if(g.vx16 > 50) {
+			g.vx16 = 50
+		}
+	} else {
+		g.vx16 = 0;
 	}
-	return false
-}
 
-func (g *Game) isLeftKeyJustPressed() bool {
-	if inpututil.IsKeyJustPressed(ebiten.KeyA) {
-		return true
-	}
-	return false
-}
-
-func (g *Game) isLeftKeyJustReleased() bool {
-	if inpututil.IsKeyJustReleased(ebiten.KeyA) {
-		return true
-	}
-	return false
+	g.x16 += g.vx16
+	g.y16 += g.vy16
 }
 
 func (g *Game) isKeyPressed(keys []ebiten.Key) bool{
@@ -292,37 +285,11 @@ func (g *Game) Update() error {
 			// g.jumpPlayer.Play()
 		}
 
-		if g.isRightKeyJustPressed() {
-			g.isMovingRight = true
-			g.isMovingLeft = false
-		}
-		if g.isLeftKeyJustPressed() {
-			g.isMovingLeft = true
-			g.isMovingRight = false
-		}
-		if g.isRightKeyJustReleased() || g.isLeftKeyJustReleased() {
-			g.isMovingRight = false
-			g.isMovingLeft = false
-			g.vx16 = 0
-		}
 		if g.isRestartJustPressed(){
 			g.mode = ModeGameOver
 		}
 
-		if g.isMovingRight {
-			g.vx16 += 10
-		}
-		if g.isMovingLeft {
-			g.vx16 -= 10
-		}
-		if g.vx16 > 50 {
-			g.vx16 = 50
-		} else if g.vx16 < -50 {
-			g.vx16 = -50
-		}
-
-		g.x16 += g.vx16
-		g.y16 += g.vy16
+		g.handleMovement()
 
 		// Gravity
 		g.vy16 += 4
