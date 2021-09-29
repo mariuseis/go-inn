@@ -228,13 +228,15 @@ func (g *Game) handleMovement() {
 		g.vx16 = 0;
 	} else if (isLeftPressed) {
 		g.vx16 -= 10
-		if(g.vx16 < -50) {
-			g.vx16 = -50
+		g.cameraX -= 2
+		if(g.vx16 < -32) {
+			g.vx16 = -32
 		}
 	} else if (isRightPressed) {
 		g.vx16 += 10
-		if(g.vx16 > 50) {
-			g.vx16 = 50
+		g.cameraX += 2
+		if(g.vx16 > 32) {
+			g.vx16 = 32
 		}
 	} else {
 		g.vx16 = 0;
