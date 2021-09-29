@@ -71,6 +71,7 @@ const (
 
 var (
 	gopherImage     *ebiten.Image
+	enemyImage		*ebiten.Image
 	tilesImage      *ebiten.Image
 	titleArcadeFont font.Face
 	arcadeFont      font.Face
@@ -88,6 +89,14 @@ func init() {
 	// 3. declare the gopherImage and use the "img" defined above
 	gopherImage = ebiten.NewImageFromImage(img)
 	// All 3 main steps are repeated for other images, in this case -> floor tiles
+
+	// TODO add enemy asset, read enemy asset image
+	// img, _, err := image.Decode(bytes.NewReader(resources.TODO_ENEMY_png))
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	enemyImage = ebiten.NewImageFromImage(img)
+
 	img, _, err = image.Decode(bytes.NewReader(resources.Tiles_png))
 	if err != nil {
 		log.Fatal(err)
@@ -320,6 +329,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.drawTiles(screen)
 	if g.mode != ModeTitle {
 		g.drawGopher(screen)
+		g.drawEnemy(screen)
 	}
 	var titleTexts []string
 	var texts []string
@@ -473,6 +483,22 @@ func (g *Game) drawGopher(screen *ebiten.Image) {
 	op.GeoM.Translate(float64(g.x16/16.0)-float64(g.cameraX), float64(g.y16/16.0)-float64(g.cameraY))
 	op.Filter = ebiten.FilterLinear
 	screen.DrawImage(gopherImage, op)
+}
+
+func (g *Game) drawEnemy(screen *ebiten.Image) {
+	op := &ebiten.DrawImageOptions{}
+	w, h := enemyImage.Size()
+
+	x := float64(screenWidth - w)
+	y := float64(screenHeight - h - 20) // draw above ground at the front
+
+	fmt.Printf("www = %g, hhh = %g \n", x, y)
+	op.GeoM.Translate(x, y)
+	// op.GeoM.Rotate(float64(g.vy16) / 96.0 * math.Pi / 6)
+	// op.GeoM.Translate(float64(w)/2.0, float64(h)/2.0)
+	// op.GeoM.Translate(float64(g.x16/16.0)-float64(g.cameraX), float64(g.y16/16.0)-float64(g.cameraY))
+	op.Filter = ebiten.FilterLinear
+	screen.DrawImage(enemyImage, op)
 }
 
 func main() {
