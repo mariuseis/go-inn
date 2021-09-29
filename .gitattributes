@@ -1,0 +1,2 @@
+# Set default behavior to automatically use lf during check in and check out.
+* text eol=lf

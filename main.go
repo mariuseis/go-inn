@@ -38,6 +38,8 @@ import (
 	resources "github.com/hajimehoshi/ebiten/v2/examples/resources/images/flappy"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
+	
+	"github.com/mariuseis/go-inn/images"
 )
 
 func init() {
@@ -64,14 +66,14 @@ const (
 	fontSize         = 24
 	smallFontSize    = fontSize / 2
 	pipeWidth        = tileSize * 2
-	pipeStartOffsetX = 8
+	pipeStartOffsetX = -1
 	pipeIntervalX    = 8
 	pipeGapY         = 5
 )
 
 var (
 	gopherImage     *ebiten.Image
-	enemyImage		*ebiten.Image
+	enemyImage      *ebiten.Image
 	tilesImage      *ebiten.Image
 	titleArcadeFont font.Face
 	arcadeFont      font.Face
@@ -81,28 +83,28 @@ var (
 //asset image declarations
 func init() {
 	// 1. create const "img" and use Gopher_png from resources
-	img, _, err := image.Decode(bytes.NewReader(resources.Gopher_png))
+	img, _, err := image.Decode(bytes.NewReader(images.Player_png))
 	// 2. handle image error
 	if err != nil {
 		log.Fatal(err)
 	}
 	// 3. declare the gopherImage and use the "img" defined above
 	gopherImage = ebiten.NewImageFromImage(img)
+
 	// All 3 main steps are repeated for other images, in this case -> floor tiles
-
-	// TODO add enemy asset, read enemy asset image
-	// img, _, err := image.Decode(bytes.NewReader(resources.TODO_ENEMY_png))
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	enemyImage = ebiten.NewImageFromImage(img)
-
 	img, _, err = image.Decode(bytes.NewReader(resources.Tiles_png))
 	if err != nil {
 		log.Fatal(err)
 	}
 	tilesImage = ebiten.NewImageFromImage(img)
+
+	img, _, err = image.Decode(bytes.NewReader(images.Enemy_png))
+	if err != nil {
+		log.Fatal(err)
+	}
+	enemyImage = ebiten.NewImageFromImage(img)
 }
+
 //text font declarations
 func init() {
 	tt, err := opentype.Parse(fonts.PressStart2P_ttf)
@@ -167,6 +169,7 @@ type Game struct {
 	pipeTileYs []int
 
 	gameoverCount int
+	jumpCount int
 
 	touchIDs   []ebiten.TouchID
 	gamepadIDs []ebiten.GamepadID
@@ -191,6 +194,7 @@ func (g *Game) init() {
 	for i := range g.pipeTileYs {
 		g.pipeTileYs[i] = rand.Intn(6) + 2
 	}
+	g.jumpCount = 0
 
 	// if g.audioContext == nil {
 	// 	g.audioContext = audio.NewContext(48000)
@@ -288,9 +292,14 @@ func (g *Game) Update() error {
 		//g.x16 += 32
 		//g.cameraX += 2
 		if g.isKeyJustPressed() {
-			if(g.y16 > 5000) { // if y position of Gopher is higher than 5000 then stop changing position (initial is 6100)
-				g.vy16 = -80 // on jump change position by -80
-			}
+			// not more than 2 jumps
+			// allow jump from collision/platforms
+			if(g.jumpCount < 2) {
+				g.vy16 = -80
+				g.jumpCount++
+			} else if(g.hit() || g.groundTouch()) {
+				g.jumpCount = 0
+			} 
 			// g.jumpPlayer.Rewind()
 			// g.jumpPlayer.Play()
 		}
@@ -308,10 +317,17 @@ func (g *Game) Update() error {
 		}
 
 		if g.hit() {
+			// fmt.Printf("it is hit")
 			// g.hitPlayer.Rewind()
 			// g.hitPlayer.Play()
 			//g.mode = ModeGameOver
 			//g.gameoverCount = 30
+			//g.vy16 = 0
+			// g.vx16 = 0
+			// fmt.Print("-----PIPE-----")
+		}
+
+		if g.groundTouch() {
 			g.vy16 = 0
 		}
 	case ModeGameOver:
@@ -404,9 +420,6 @@ func (g *Game) hit() bool {
 	if y0 < -tileSize*4 {
 		return true
 	}
-	if y1 >= screenHeight-tileSize {
-		return true
-	}
 	xMin := floorDiv(x0-pipeWidth, tileSize)
 	xMax := floorDiv(x0+gopherWidth, tileSize)
 	for x := xMin; x <= xMax; x++ {
@@ -440,6 +453,21 @@ func (g *Game) drawPlatforms(screen *ebiten.Image, platforms []Platform){
 			screen.DrawImage(tilesImage.SubImage(image.Rect(0, 290, tileSize, 290 + tileSize)).(*ebiten.Image), op)
 		}
 	}
+}
+
+func (g *Game) groundTouch() bool {
+	const gopherHeight = 60
+	_, h := gopherImage.Size()
+
+	y0 := floorDiv(g.y16, 16) + (h-gopherHeight)/2
+	y1 := y0 + gopherHeight
+
+	if y1 >= screenHeight-tileSize {
+		// fmt.Printf("---ground---")
+		return true
+	}
+
+	return false
 }
 
 func (g *Game) drawTiles(screen *ebiten.Image) {
