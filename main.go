@@ -484,7 +484,7 @@ func (g *Game) drawEnemy(screen *ebiten.Image) {
 	x := float64(screenWidth - w)
 	y := float64(screenHeight - h - 20) // draw above ground at the front
 
-	fmt.Printf("www = %g, hhh = %g \n", x, y)
+	// fmt.Printf("www = %g, hhh = %g \n", x, y)
 	op.GeoM.Translate(x, y)
 	// op.GeoM.Rotate(float64(g.vy16) / 96.0 * math.Pi / 6)
 	// op.GeoM.Translate(float64(w)/2.0, float64(h)/2.0)
