@@ -77,20 +77,24 @@ var (
 	smallArcadeFont font.Face
 )
 
+//asset image declarations
 func init() {
+	// 1. create const "img" and use Gopher_png from resources
 	img, _, err := image.Decode(bytes.NewReader(resources.Gopher_png))
+	// 2. handle image error
 	if err != nil {
 		log.Fatal(err)
 	}
+	// 3. declare the gopherImage and use the "img" defined above
 	gopherImage = ebiten.NewImageFromImage(img)
-
+	// All 3 main steps are repeated for other images, in this case -> floor tiles
 	img, _, err = image.Decode(bytes.NewReader(resources.Tiles_png))
 	if err != nil {
 		log.Fatal(err)
 	}
 	tilesImage = ebiten.NewImageFromImage(img)
 }
-
+//text font declarations
 func init() {
 	tt, err := opentype.Parse(fonts.PressStart2P_ttf)
 	if err != nil {
@@ -312,7 +316,7 @@ func (g *Game) Update() error {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	screen.Fill(color.RGBA{0x80, 0xa0, 0xc0, 0xff})
+	screen.Fill(color.RGBA{0x80, 0xa0, 0xc0, 0xff}) //background color
 	g.drawTiles(screen)
 	if g.mode != ModeTitle {
 		g.drawGopher(screen)
