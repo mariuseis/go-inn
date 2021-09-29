@@ -287,7 +287,7 @@ func (g *Game) Update() error {
 		g.y16 += g.vy16
 
 		// Gravity
-		// g.vy16 += 4
+		g.vy16 += 4
 		if g.vy16 > 96 {
 			g.vy16 = 96
 		}
@@ -295,8 +295,9 @@ func (g *Game) Update() error {
 		if g.hit() {
 			// g.hitPlayer.Rewind()
 			// g.hitPlayer.Play()
-			g.mode = ModeGameOver
-			g.gameoverCount = 30
+			//g.mode = ModeGameOver
+			//g.gameoverCount = 30
+			g.vy16 = 0
 		}
 	case ModeGameOver:
 		if g.gameoverCount > 0 {
