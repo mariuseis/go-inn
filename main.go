@@ -282,7 +282,9 @@ func (g *Game) Update() error {
 		//g.x16 += 32
 		//g.cameraX += 2
 		if g.isKeyJustPressed() {
-			g.vy16 = -12
+			if(g.y16 > 5000) { // if y position of Gopher is higher than 5000 then stop changing position (initial is 6100)
+				g.vy16 = -80 // on jump change position by -80
+			}
 			// g.jumpPlayer.Rewind()
 			// g.jumpPlayer.Play()
 		}
@@ -497,7 +499,7 @@ func (g *Game) drawEnemy(screen *ebiten.Image) {
 
 func main() {
 	ebiten.SetWindowSize(screenWidth, screenHeight)
-	ebiten.SetWindowTitle("Flappy Gopher (Ebiten Demo)")
+	ebiten.SetWindowTitle("Go Inn")
 	if err := ebiten.RunGame(NewGame()); err != nil {
 		panic(err)
 	}
