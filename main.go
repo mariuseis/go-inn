@@ -404,12 +404,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			g.projectiles = append(g.projectiles[:i], g.projectiles[i+1:]...)
 		}
 	}
-	platformA := Platform{baseCollider: BaseCollider{x: 400, y: 200}, tileCount: 10}
-	platformB := Platform{baseCollider: BaseCollider{x: 320, y: 400}, tileCount: 4}
+
+	platformA := Platform{baseCollider: BaseCollider{x: 320, y: 400}, tileCount: 4}
+	platformB := Platform{baseCollider: BaseCollider{x: 480, y: 320}, tileCount: 6}
 	g.platforms = []Platform{platformA, platformB}
 	g.drawPlatforms(screen, g.platforms, 0, 290)
 
-	killBoxA := Platform{baseCollider: BaseCollider{x: 820, y: 300}, tileCount: 4}
+	killBoxA := Platform{baseCollider: BaseCollider{x: 440, y: 360}, tileCount: 1}
 	g.killBoxes = []Platform{killBoxA}
 	g.drawPlatforms(screen, g.killBoxes, 96, 290)
 
@@ -437,8 +438,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.mode == ModeTitle {
 		msg := []string{
-			"Go Gopher by Renee French is",
-			"licenced under CC BY 3.0.",
+			"Go INN",
 		}
 		for i, l := range msg {
 			x := (screenWidth - len(l)*smallFontSize) / 2
@@ -499,8 +499,8 @@ func (g *Game) hitKillbox() bool {
 		gopherHeight = 75
 	)
 	for _, killbox := range g.killBoxes {
-		if(g.x16 + gopherWidth > killbox.baseCollider.x && g.x16 < killbox.baseCollider.x + tileSize * killbox.tileCount) {
-			if(g.y16 < killbox.baseCollider.y + tileSize && g.y16 + gopherHeight > killbox.baseCollider.y) {
+		if g.x16+gopherWidth > killbox.baseCollider.x && g.x16 < killbox.baseCollider.x+tileSize*killbox.tileCount {
+			if g.y16 < killbox.baseCollider.y+tileSize && g.y16+gopherHeight > killbox.baseCollider.y {
 				return true
 			}
 		}
@@ -514,8 +514,8 @@ func (g *Game) hitPlatformTop() bool {
 		gopherHeight = 75
 	)
 	for _, killbox := range g.platforms {
-		if(g.x16 + gopherWidth > killbox.baseCollider.x && g.x16 < killbox.baseCollider.x + tileSize * killbox.tileCount) {
-			if(g.y16 + gopherHeight < killbox.baseCollider.y + tileSize && g.y16 + gopherHeight > killbox.baseCollider.y) {
+		if g.x16+gopherWidth > killbox.baseCollider.x && g.x16 < killbox.baseCollider.x+tileSize*killbox.tileCount {
+			if g.y16+gopherHeight < killbox.baseCollider.y+tileSize && g.y16+gopherHeight > killbox.baseCollider.y {
 				return true
 			}
 		}
@@ -523,7 +523,7 @@ func (g *Game) hitPlatformTop() bool {
 	return false
 }
 
-func (g *Game) drawPlatforms(screen *ebiten.Image, platforms []Platform, offsetX int, offsetY int){
+func (g *Game) drawPlatforms(screen *ebiten.Image, platforms []Platform, offsetX int, offsetY int) {
 	op := &ebiten.DrawImageOptions{}
 
 	for _, platform := range platforms {
