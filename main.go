@@ -164,6 +164,10 @@ type Platform struct {
 	tileCount    int
 }
 
+type Enemy struct {
+	baseCollider BaseCollider
+	vx           int
+}
 type Projectile struct {
 	lifespan     int
 	isMovingLeft bool
@@ -188,8 +192,8 @@ type Game struct {
 	// Pipes
 	pipeTileYs []int
 
-	enemyPosition BaseCollider
-	projectiles   []Projectile
+	enemies     []Enemy
+	projectiles []Projectile
 
 	gameoverCount int
 	jumpCount     int
@@ -218,6 +222,10 @@ func (g *Game) init() {
 		g.pipeTileYs[i] = rand.Intn(6) + 2
 	}
 	g.jumpCount = 0
+
+	enemyA := Enemy{baseCollider: BaseCollider{x: 320, y: 400}, vx: 2}
+	enemyB := Enemy{baseCollider: BaseCollider{x: 0, y: 150}, vx: 2}
+	g.enemies = []Enemy{enemyA, enemyB}
 
 	if g.audioContext == nil {
 		g.audioContext = audio.NewContext(48000)
@@ -345,6 +353,7 @@ func (g *Game) Update() error {
 		}
 
 		g.handleMovement()
+		g.moveEnemies()
 
 		if g.hitKillbox() {
 			g.mode = ModeGameOver
@@ -402,7 +411,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.mode != ModeTitle {
 		g.drawGopher(screen)
-		g.drawEnemy(screen)
+		g.drawEnemies(screen, g.enemies)
 	}
 	var titleTexts []string
 	var texts []string
@@ -512,8 +521,8 @@ func (g *Game) drawPlatforms(screen *ebiten.Image, platforms []Platform, offsetX
 	for _, platform := range platforms {
 		for i := 0; i < platform.tileCount; i++ {
 			op.GeoM.Reset()
-			op.GeoM.Translate(float64(platform.baseCollider.x + tileSize * i - g.cameraX), float64(platform.baseCollider.y))
-			screen.DrawImage(tilesImage.SubImage(image.Rect(offsetX, offsetY, offsetX + tileSize, offsetY + tileSize)).(*ebiten.Image), op)
+			op.GeoM.Translate(float64(platform.baseCollider.x+tileSize*i-g.cameraX), float64(platform.baseCollider.y))
+			screen.DrawImage(tilesImage.SubImage(image.Rect(offsetX, offsetY, offsetX+tileSize, offsetY+tileSize)).(*ebiten.Image), op)
 		}
 	}
 }
@@ -532,12 +541,27 @@ func (g *Game) groundTouch() bool {
 
 	y0 := g.y16 + (h-gopherHeight)/2
 	y1 := y0 + gopherHeight
-
 	if y1 >= screenHeight-tileSize {
 		// fmt.Printf("---ground---")
 		return true
 	}
 	return false
+}
+
+func (g *Game) moveEnemies() {
+	// enemy.vx -= moveAcceleration
+	// if enemy.vx < -2 {
+	// 	enemy.vx = -2
+	// }
+	for index := range g.enemies {
+		g.enemies[index].baseCollider.x -= 1
+	}
+
+	// g.cameraX += g.vx16
+
+	// call on update
+	// reduce value of enemy's x position by 1
+	//will it repaint enemy on gopherDraw?
 }
 
 func flipAsset(image *ebiten.Image, op *ebiten.DrawImageOptions) {
@@ -610,22 +634,27 @@ func (g *Game) drawGopher(screen *ebiten.Image) {
 	screen.DrawImage(gopherImage, op)
 }
 
-func (g *Game) drawEnemy(screen *ebiten.Image) {
+func (g *Game) drawEnemies(screen *ebiten.Image, enemies []Enemy) {
 	op := &ebiten.DrawImageOptions{}
-	w, h := enemyImage.Size()
+	// w, h := enemyImage.Size()
 
-	//flip asset
-	flipAsset(enemyImage, op)
+	for _, enemy := range enemies {
+		op.GeoM.Reset()
+		//flip asset
+		flipAsset(enemyImage, op)
 
-	//place at right bottom, behind the initial screen
-	op.GeoM.Translate(float64(screenWidth/2+w*2), float64(screenHeight-h))
+		//place at right bottom, behind the initial screen
+		// op.GeoM.Translate(float64(screenWidth/2+w*2), float64(screenHeight-h))
 
-	// make it sit on terain, idk about the division by 3, just works
-	op.GeoM.Translate(0, -float64(h)/3.0)
+		// // make it sit on terain, idk about the division by 3, just works
+		// op.GeoM.Translate(0, -float64(h)/3.0)
 
-	op.GeoM.Translate(float64(g.enemyPosition.x)-float64(g.cameraX), float64(g.enemyPosition.y)-float64(g.cameraY))
-	op.Filter = ebiten.FilterLinear
-	screen.DrawImage(enemyImage, op)
+		op.GeoM.Translate(float64(enemy.baseCollider.x-g.cameraX), float64(enemy.baseCollider.y))
+		op.Filter = ebiten.FilterLinear
+		screen.DrawImage(enemyImage, op)
+	}
+
+	//make check for position to approach each other
 }
 
 func main() {
