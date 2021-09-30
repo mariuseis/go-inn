@@ -346,6 +346,10 @@ func (g *Game) Update() error {
 
 		g.handleMovement()
 
+		if g.hitKillbox() {
+			g.mode = ModeGameOver
+		}
+
 		// if g.hit() {
 		// 	// fmt.Printf("it is hit")
 		// 	// g.hitPlayer.Rewind()
@@ -485,6 +489,21 @@ func (g *Game) hit() (bool, string) {
 	}
 
 	return false, ""
+}
+
+func (g *Game) hitKillbox() bool {
+	const (
+		gopherWidth  = 60
+		gopherHeight = 75
+	)
+	for _, killbox := range g.killBoxes {
+		if(g.x16 + gopherWidth > killbox.baseCollider.x && g.x16 < killbox.baseCollider.x + tileSize * killbox.tileCount) {
+			if(g.y16 < killbox.baseCollider.y + tileSize && g.y16 + gopherHeight > killbox.baseCollider.y) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (g *Game) drawPlatforms(screen *ebiten.Image, platforms []Platform, offsetX int, offsetY int){
