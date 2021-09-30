@@ -75,6 +75,12 @@ const (
 	pipeStartOffsetX = -1
 	pipeIntervalX    = 8
 	pipeGapY         = 5
+
+	maxMoveVelocity        = 3
+	moveAcceleration    = 1
+	gravityAcceleration = 1
+	maxGravityVelocity  = 8
+	jumpVelocity        = 8
 )
 
 var (
@@ -213,7 +219,7 @@ func NewGame() *Game {
 
 func (g *Game) init() {
 	g.x16 = 0
-	g.y16 = 100 * 16
+	g.y16 = 100 
 	g.cameraX = -240
 	g.cameraY = 0
 	g.pipeTileYs = make([]int, 256)
@@ -265,7 +271,7 @@ func (g *Game) handleMovement() {
 		// not more than 2 jumps
 		// allow jump from collision/platforms
 		if(g.jumpCount < 2) {
-			g.vy16 = -80
+			g.vy16 = -jumpVelocity * 2
 			g.jumpCount++
 		} else if(g.hit() || g.groundTouch()) {
 			g.jumpCount = 0
@@ -278,17 +284,17 @@ func (g *Game) handleMovement() {
 		if (areBothPressed) {
 			g.vx16 = 0;
 		} else if (isLeftPressed) {
-			g.vx16 -= 10
-			g.cameraX -= 2
-			if(g.vx16 < -32) {
-				g.vx16 = -32
+			g.vx16 -= moveAcceleration
+			if(g.vx16 < -maxMoveVelocity) {
+				g.vx16 = -maxMoveVelocity
 			}
+			g.cameraX += g.vx16
 		} else if (isRightPressed) {
-			g.vx16 += 10
-			g.cameraX += 2
-			if(g.vx16 > 32) {
-				g.vx16 = 32
+			g.vx16 += moveAcceleration
+			if(g.vx16 > maxMoveVelocity) {
+				g.vx16 = maxMoveVelocity
 			}
+			g.cameraX += g.vx16
 		} else {
 			g.vx16 = 0;
 		}
@@ -339,15 +345,15 @@ func (g *Game) Update() error {
 		}
 
 		if inpututil.IsKeyJustPressed(ebiten.KeyF) {
-			g.projectiles = append(g.projectiles, Projectile{baseCollider: BaseCollider{x: (g.x16/16 + screenWidth / 2), y: screenHeight - 60 - (6160 - g.y16)/16}, lifespan: 100})
+			g.projectiles = append(g.projectiles, Projectile{baseCollider: BaseCollider{x: (g.x16 + screenWidth / 2), y: screenHeight - 60 - (6160 - g.y16)}, lifespan: 100})
 		}
 
 		g.handleMovement()
 
 		// Gravity
-		g.vy16 += 4
-		if g.vy16 > 96 {
-			g.vy16 = 96
+		g.vy16 += gravityAcceleration
+		if g.vy16 > maxGravityVelocity {
+			g.vy16 = maxGravityVelocity
 		}
 
 		// if g.hit() {
@@ -426,7 +432,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	scoreStr := fmt.Sprintf("%04d", g.score())
 	text.Draw(screen, scoreStr, arcadeFont, screenWidth-len(scoreStr)*fontSize, fontSize, color.White)
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %0.2f X: %1d Y: %2d VX: %1d VY: %2d", ebiten.CurrentTPS(),  g.x16 / 16,  g.y16 / 16,  g.vx16 ,  g.vy16 ))
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %0.2f X: %1d Y: %2d VX: %1d VY: %2d", ebiten.CurrentTPS(),  g.x16 ,  g.y16 ,  g.vx16 ,  g.vy16 ))
 }
 
 func (g *Game) pipeAt(tileX int) (tileY int, ok bool) {
@@ -441,7 +447,7 @@ func (g *Game) pipeAt(tileX int) (tileY int, ok bool) {
 }
 
 func (g *Game) score() int {
-	x := floorDiv(g.x16, 16) / tileSize
+	x := g.x16 / tileSize
 	if (x - pipeStartOffsetX) <= 0 {
 		return 0
 	}
@@ -471,7 +477,7 @@ func (g *Game) hit() bool {
 	for i:=0; i < len(g.platforms); i++ {
 		p := g.platforms[i]
 		// Platform{baseCollider: BaseCollider{x: 400, y: 200}, tileCount: 10}
-		player := Collidable{baseCollider: BaseCollider{x: g.x16, y: floorDiv(g.y16, 16)}, width: gopherWidth, height: gopherHeight}
+		player := Collidable{baseCollider: BaseCollider{x: g.x16, y: g.y16}, width: gopherWidth, height: gopherHeight}
 		platform := Collidable{baseCollider: BaseCollider{x: p.baseCollider.x, y: p.baseCollider.y},  width: p.tileCount * tileSize, height: tileSize}
 		
 		// y0 := floorDiv(g.y16, 16) + (h-gopherHeight)/2
@@ -497,7 +503,7 @@ func (g *Game) drawPlatforms(screen *ebiten.Image, platforms []Platform){
 	for _, platform := range platforms {
 		for i := 0; i < platform.tileCount; i++ {
 			op.GeoM.Reset()
-			op.GeoM.Translate(float64(platform.baseCollider.x + tileSize * i + (g.cameraX - g.x16)/16), float64(platform.baseCollider.y))
+			op.GeoM.Translate(float64(platform.baseCollider.x + tileSize * i - g.cameraX), float64(platform.baseCollider.y))
 			screen.DrawImage(tilesImage.SubImage(image.Rect(0, 290, tileSize, 290 + tileSize)).(*ebiten.Image), op)
 		}
 	}
@@ -515,14 +521,13 @@ func (g *Game) groundTouch() bool {
 	const gopherHeight = 60
 	_, h := gopherImage.Size()
 
-	y0 := floorDiv(g.y16, 16) + (h-gopherHeight)/2
+	y0 := g.y16 + (h-gopherHeight)/2
 	y1 := y0 + gopherHeight
 
 	if y1 >= screenHeight-tileSize {
 		// fmt.Printf("---ground---")
 		return true
 	}
-
 	return false
 }
 
@@ -588,7 +593,7 @@ func (g *Game) drawGopher(screen *ebiten.Image) {
 	op.GeoM.Translate(-float64(w)/2.0, -float64(h)/2.0)
 	op.GeoM.Rotate(float64(g.vy16) / 96.0 * math.Pi / 6)
 	op.GeoM.Translate(float64(w)/2.0, float64(h)/2.0)
-	op.GeoM.Translate(float64(g.x16/16.0)-float64(g.cameraX), float64(g.y16/16.0)-float64(g.cameraY))
+	op.GeoM.Translate(float64(g.x16)-float64(g.cameraX), float64(g.y16)-float64(g.cameraY))
 	op.Filter = ebiten.FilterLinear
 	screen.DrawImage(gopherImage, op)
 }
@@ -606,7 +611,7 @@ func (g *Game) drawEnemy(screen *ebiten.Image) {
 	// make it sit on terain, idk about the division by 3, just works
 	op.GeoM.Translate(0, -float64(h)/3.0)
 
-	op.GeoM.Translate(float64(g.enemyPosition.x/16.0)-float64(g.cameraX), float64(g.enemyPosition.y/16.0)-float64(g.cameraY))
+	op.GeoM.Translate(float64(g.enemyPosition.x)-float64(g.cameraX), float64(g.enemyPosition.y)-float64(g.cameraY))
 	op.Filter = ebiten.FilterLinear
 	screen.DrawImage(enemyImage, op)
 }
