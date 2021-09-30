@@ -212,6 +212,13 @@ func NewGame() *Game {
 	return g
 }
 
+func createEnemy() Enemy {
+	gopherHeight := 60
+	groundPositionY := screenHeight - gopherHeight - tileSize
+	enemy := Enemy{baseCollider: BaseCollider{x: rand.Intn(screenWidth), y: groundPositionY}, vx: 2}
+	return enemy
+}
+
 func (g *Game) init() {
 	g.x16 = 0
 	g.y16 = 100
@@ -223,9 +230,20 @@ func (g *Game) init() {
 	}
 	g.jumpCount = 0
 
-	enemyA := Enemy{baseCollider: BaseCollider{x: 320, y: 400}, vx: 2}
-	enemyB := Enemy{baseCollider: BaseCollider{x: 0, y: 150}, vx: 2}
-	g.enemies = []Enemy{enemyA, enemyB}
+	enemyCount := rand.Intn(8)
+	var enemies []Enemy
+
+	for i := 1; i <= enemyCount; i++ {
+		enemy := createEnemy()
+		enemies = append(enemies, enemy)
+	}
+
+	// enemyA := createEnemy()
+	// enemyB := Enemy{baseCollider: BaseCollider{x: 0, y: 150}, vx: 2}
+	g.enemies = enemies
+
+	// fmt.Println(enemies, "enemies")
+	fmt.Println(enemyCount, "enemyCount")
 
 	if g.audioContext == nil {
 		g.audioContext = audio.NewContext(48000)
