@@ -71,6 +71,7 @@ var (
 	enemyImage      *ebiten.Image
 	tilesImage      *ebiten.Image
 	bulletImage     *ebiten.Image
+	treeImage       *ebiten.Image
 	titleArcadeFont font.Face
 	arcadeFont      font.Face
 	smallArcadeFont font.Face
@@ -105,6 +106,12 @@ func init() {
 		log.Fatal(err)
 	}
 	bulletImage = ebiten.NewImageFromImage(img)
+
+	img, _, err = image.Decode(bytes.NewReader(images.Tree_png))
+	if err != nil {
+		log.Fatal(err)
+	}
+	treeImage = ebiten.NewImageFromImage(img)
 }
 
 //text font declarations
@@ -189,9 +196,6 @@ type Game struct {
 	cameraX int
 	cameraY int
 
-	// Pipes
-	pipeTileYs []int
-
 	enemies     []Enemy
 	projectiles []Projectile
 
@@ -217,10 +221,6 @@ func (g *Game) init() {
 	g.y16 = 100
 	g.cameraX = -240
 	g.cameraY = 0
-	g.pipeTileYs = make([]int, 256)
-	for i := range g.pipeTileYs {
-		g.pipeTileYs[i] = rand.Intn(6) + 2
-	}
 	g.jumpCount = 0
 
 	enemyA := Enemy{baseCollider: BaseCollider{x: 320, y: 400}, vx: 2}
@@ -451,17 +451,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %0.2f X: %1d Y: %2d VX: %1d VY: %2d", ebiten.CurrentTPS(), g.x16, g.y16, g.vx16, g.vy16))
 }
 
-func (g *Game) pipeAt(tileX int) (tileY int, ok bool) {
-	if (tileX - pipeStartOffsetX) <= 0 {
-		return 0, false
-	}
-	if floorMod(tileX-pipeStartOffsetX, pipeIntervalX) != 0 {
-		return 0, false
-	}
-	idx := floorDiv(tileX-pipeStartOffsetX, pipeIntervalX)
-	return g.pipeTileYs[idx%len(g.pipeTileYs)], true
-}
-
 func (g *Game) score() int {
 	x := g.x16 / tileSize
 	if (x - pipeStartOffsetX) <= 0 {
@@ -606,36 +595,13 @@ func (g *Game) drawTiles(screen *ebiten.Image) {
 		op.GeoM.Translate(float64(i*tileSize-floorMod(g.cameraX, tileSize)),
 			float64((ny-1)*tileSize-floorMod(g.cameraY, tileSize)))
 		screen.DrawImage(tilesImage.SubImage(image.Rect(0, 0, tileSize, tileSize)).(*ebiten.Image), op)
-
 		// pipe
-		if tileY, ok := g.pipeAt(floorDiv(g.cameraX, tileSize) + i); ok {
-			for j := 0; j < tileY; j++ {
-				op.GeoM.Reset()
-				op.GeoM.Scale(1, -1)
-				op.GeoM.Translate(float64(i*tileSize-floorMod(g.cameraX, tileSize)),
-					float64(j*tileSize-floorMod(g.cameraY, tileSize)))
-				op.GeoM.Translate(0, tileSize)
-				var r image.Rectangle
-				if j == tileY-1 {
-					r = image.Rect(pipeTileSrcX, pipeTileSrcY, pipeTileSrcX+tileSize*2, pipeTileSrcY+tileSize)
-				} else {
-					r = image.Rect(pipeTileSrcX, pipeTileSrcY+tileSize, pipeTileSrcX+tileSize*2, pipeTileSrcY+tileSize*2)
-				}
-				screen.DrawImage(tilesImage.SubImage(r).(*ebiten.Image), op)
-			}
-			for j := tileY + pipeGapY; j < screenHeight/tileSize-1; j++ {
-				op.GeoM.Reset()
-				op.GeoM.Translate(float64(i*tileSize-floorMod(g.cameraX, tileSize)),
-					float64(j*tileSize-floorMod(g.cameraY, tileSize)))
-				var r image.Rectangle
-				if j == tileY+pipeGapY {
-					r = image.Rect(pipeTileSrcX, pipeTileSrcY, pipeTileSrcX+pipeWidth, pipeTileSrcY+tileSize)
-				} else {
-					r = image.Rect(pipeTileSrcX, pipeTileSrcY+tileSize, pipeTileSrcX+pipeWidth, pipeTileSrcY+tileSize+tileSize)
-				}
-				screen.DrawImage(tilesImage.SubImage(r).(*ebiten.Image), op)
-			}
-		}
+		treeHeight := 128
+		approxGroundCoord := 182
+		spacing := 8 * tileSize
+		op.GeoM.Reset()
+		op.GeoM.Translate(float64(spacing*i-floorMod(g.cameraX, spacing)), float64(approxGroundCoord+treeHeight))
+		screen.DrawImage(treeImage, op)
 	}
 }
 
