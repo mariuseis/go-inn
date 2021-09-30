@@ -75,6 +75,7 @@ const (
 	pipeStartOffsetX = -1
 	pipeIntervalX    = 8
 	pipeGapY         = 5
+	projectileSpeed  = 5
 
 	maxMoveVelocity        = 3
 	moveAcceleration    = 1
@@ -176,6 +177,7 @@ type Platform struct {
 
 type Projectile struct {
 	lifespan int
+	isMovingLeft bool
 	baseCollider BaseCollider
 }
 
@@ -349,7 +351,8 @@ func (g *Game) Update() error {
 		}
 
 		if inpututil.IsKeyJustPressed(ebiten.KeyF) {
-			g.projectiles = append(g.projectiles, Projectile{baseCollider: BaseCollider{x: (g.x16 + screenWidth / 2), y: screenHeight - 60 - (6160 - g.y16)}, lifespan: 100})
+
+			g.projectiles = append(g.projectiles, Projectile{baseCollider: BaseCollider{x: g.x16, y: screenHeight - 60 - (384 - g.y16)}, lifespan: 100, isMovingLeft: g.movingLeft})
 		}
 
 		g.handleMovement()
@@ -391,7 +394,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.drawTiles(screen)
 	for i := len(g.projectiles)-1; i >= 0; i-- {
 		g.drawProjectile(screen, g.projectiles[i])
-		g.projectiles[i].baseCollider.x += 3
+		if (g.projectiles[i].isMovingLeft) {
+			g.projectiles[i].baseCollider.x -= projectileSpeed
+		} else {
+		g.projectiles[i].baseCollider.x += projectileSpeed
+		}
 		g.projectiles[i].lifespan -= 1
 		if (g.projectiles[i].lifespan < 1) {
 			g.projectiles = append(g.projectiles[:i], g.projectiles[i+1:]...)
@@ -517,7 +524,7 @@ func (g *Game) drawProjectile(screen *ebiten.Image, projectile Projectile) {
 	op := &ebiten.DrawImageOptions{}
 
 	op.GeoM.Reset()
-	op.GeoM.Translate(float64(projectile.baseCollider.x + (g.cameraX - g.x16)/15), float64(projectile.baseCollider.y))
+	op.GeoM.Translate(float64(projectile.baseCollider.x - g.cameraX), float64(projectile.baseCollider.y))
 	screen.DrawImage(tilesImage.SubImage(image.Rect(0, 290, tileSize, 290 + tileSize)).(*ebiten.Image), op)
 }
 
