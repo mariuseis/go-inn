@@ -1,20 +1,3 @@
-// Copyright 2018 The Ebiten Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-//go:build example
-// +build example
-
 package main
 
 import (
@@ -74,6 +57,7 @@ const (
 	pipeStartOffsetX = -1
 	pipeIntervalX    = 8
 	pipeGapY         = 5
+	projectileSpeed  = 5
 
 	maxMoveVelocity     = 3
 	moveAcceleration    = 1
@@ -86,6 +70,7 @@ var (
 	gopherImage     *ebiten.Image
 	enemyImage      *ebiten.Image
 	tilesImage      *ebiten.Image
+	bulletImage     *ebiten.Image
 	titleArcadeFont font.Face
 	arcadeFont      font.Face
 	smallArcadeFont font.Face
@@ -114,6 +99,12 @@ func init() {
 		log.Fatal(err)
 	}
 	enemyImage = ebiten.NewImageFromImage(img)
+
+	img, _, err = image.Decode(bytes.NewReader(images.Bullet_png))
+	if err != nil {
+		log.Fatal(err)
+	}
+	bulletImage = ebiten.NewImageFromImage(img)
 }
 
 //text font declarations
@@ -177,9 +168,9 @@ type Enemy struct {
 	baseCollider BaseCollider
 	vx           int
 }
-
 type Projectile struct {
 	lifespan     int
+	isMovingLeft bool
 	baseCollider BaseCollider
 }
 
@@ -191,6 +182,8 @@ type Game struct {
 	y16  int
 	vy16 int
 	vx16 int
+
+	movingLeft bool
 
 	// Camera
 	cameraX int
@@ -205,14 +198,12 @@ type Game struct {
 	gameoverCount int
 	jumpCount     int
 
-	touchIDs   []ebiten.TouchID
-	gamepadIDs []ebiten.GamepadID
-
 	audioContext *audio.Context
 	jumpPlayer   *audio.Player
 	hitPlayer    *audio.Player
 
 	platforms []Platform
+	killBoxes []Platform
 }
 
 func NewGame() *Game {
@@ -241,7 +232,6 @@ func (g *Game) init() {
 	}
 
 	jumpD, err := vorbis.Decode(g.audioContext, bytes.NewReader(raudio.Jump_ogg))
-	fmt.Println(jumpD, err)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -275,29 +265,32 @@ func (g *Game) handleMovement() {
 	isRightPressed := g.isKeyPressed([]ebiten.Key{ebiten.KeyD}) || g.isKeyPressed([]ebiten.Key{ebiten.KeyArrowRight})
 	areBothPressed := g.isKeyPressed([]ebiten.Key{ebiten.KeyA, ebiten.KeyD}) || g.isKeyPressed([]ebiten.Key{ebiten.KeyArrowLeft, ebiten.KeyArrowRight})
 
+	g.movingLeft = !areBothPressed && isLeftPressed
+
+	isHit, collidableDirection := g.hit()
+
 	if g.isKeyJustPressed() {
 		// not more than 2 jumps
 		// allow jump from collision/platforms
 		if g.jumpCount < 2 {
 			g.vy16 = -jumpVelocity * 2
 			g.jumpCount++
-		} else if g.hit() || g.groundTouch() {
+		} else if isHit || g.groundTouch() {
 			g.jumpCount = 0
 		}
 		g.jumpPlayer.Rewind()
 		g.jumpPlayer.Play()
 	}
 
-	// if !g.hit() {
 	if areBothPressed {
 		g.vx16 = 0
-	} else if isLeftPressed {
+	} else if isLeftPressed && collidableDirection != "right" {
 		g.vx16 -= moveAcceleration
 		if g.vx16 < -maxMoveVelocity {
 			g.vx16 = -maxMoveVelocity
 		}
 		g.cameraX += g.vx16
-	} else if isRightPressed {
+	} else if isRightPressed && collidableDirection != "left" {
 		g.vx16 += moveAcceleration
 		if g.vx16 > maxMoveVelocity {
 			g.vx16 = maxMoveVelocity
@@ -309,10 +302,12 @@ func (g *Game) handleMovement() {
 
 	g.x16 += g.vx16
 	g.y16 += g.vy16
-	// } else {
-	// 	g.vx16 = 0
-	// 	g.vy16 = 0
-	// }
+
+	// Gravity
+	g.vy16 += gravityAcceleration
+	if g.vy16 > maxGravityVelocity {
+		g.vy16 = maxGravityVelocity
+	}
 }
 
 func (g *Game) isKeyPressed(keys []ebiten.Key) bool {
@@ -353,17 +348,12 @@ func (g *Game) Update() error {
 		}
 
 		if inpututil.IsKeyJustPressed(ebiten.KeyF) {
-			g.projectiles = append(g.projectiles, Projectile{baseCollider: BaseCollider{x: (g.x16 + screenWidth/2), y: screenHeight - 60 - (6160 - g.y16)}, lifespan: 100})
+
+			g.projectiles = append(g.projectiles, Projectile{baseCollider: BaseCollider{x: g.x16, y: screenHeight - 60 - (384 - g.y16)}, lifespan: 200, isMovingLeft: g.movingLeft})
 		}
 
 		g.handleMovement()
 		g.moveEnemies()
-
-		// Gravity
-		g.vy16 += gravityAcceleration
-		if g.vy16 > maxGravityVelocity {
-			g.vy16 = maxGravityVelocity
-		}
 
 		// if g.hit() {
 		// 	// fmt.Printf("it is hit")
@@ -396,7 +386,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.drawTiles(screen)
 	for i := len(g.projectiles) - 1; i >= 0; i-- {
 		g.drawProjectile(screen, g.projectiles[i])
-		g.projectiles[i].baseCollider.x += 3
+		if g.projectiles[i].isMovingLeft {
+			g.projectiles[i].baseCollider.x -= projectileSpeed
+		} else {
+			g.projectiles[i].baseCollider.x += projectileSpeed
+		}
 		g.projectiles[i].lifespan -= 1
 		if g.projectiles[i].lifespan < 1 {
 			g.projectiles = append(g.projectiles[:i], g.projectiles[i+1:]...)
@@ -405,7 +399,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	platformA := Platform{baseCollider: BaseCollider{x: 400, y: 200}, tileCount: 10}
 	platformB := Platform{baseCollider: BaseCollider{x: 320, y: 400}, tileCount: 4}
 	g.platforms = []Platform{platformA, platformB}
-	g.drawPlatforms(screen, g.platforms)
+	g.drawPlatforms(screen, g.platforms, 0, 290)
+
+	killBoxA := Platform{baseCollider: BaseCollider{x: 820, y: 300}, tileCount: 4}
+	g.killBoxes = []Platform{killBoxA}
+	g.drawPlatforms(screen, g.killBoxes, 96, 290)
+
 	if g.mode != ModeTitle {
 		g.drawGopher(screen)
 		g.drawEnemies(screen, g.enemies)
@@ -463,56 +462,48 @@ func (g *Game) score() int {
 	return floorDiv(x-pipeStartOffsetX, pipeIntervalX)
 }
 
-func (g *Game) hit() bool {
+func (g *Game) hit() (bool, string) {
 
 	const (
 		gopherWidth  = 30
 		gopherHeight = 60
 	)
 
-	// w, h := gopherImage.Size()
-
-	// fmt.Printf("gopher stats HARDCODED w: %d, h: %d", gopherWidth, gopherHeight)
-	// fmt.Printf("gopher stats w: %d, h: %d", w, h)
-
-	// x1 := x0 + gopherWidth
-	// y1 := y0 + gopherHeight
-
-	// wTile, hTile := tilesImage.Size()
-	// x1 := x0 + gopherWidth
-	// y1 := y0 + gopherHeight
-
 	for i := 0; i < len(g.platforms); i++ {
 		p := g.platforms[i]
-		// Platform{baseCollider: BaseCollider{x: 400, y: 200}, tileCount: 10}
 		player := Collidable{baseCollider: BaseCollider{x: g.x16, y: g.y16}, width: gopherWidth, height: gopherHeight}
 		platform := Collidable{baseCollider: BaseCollider{x: p.baseCollider.x, y: p.baseCollider.y}, width: p.tileCount * tileSize, height: tileSize}
 
-		// y0 := floorDiv(g.y16, 16) + (h-gopherHeight)/2
+		// fmt.Printf("+++++ player x: %d, y: %d, width: %d, height: %d", player.baseCollider.x, player.baseCollider.y, player.width, player.height)
+		// fmt.Printf("----- platform x: %d, y: %d, width: %d, height: %d", platform.baseCollider.x, platform.baseCollider.y, platform.width, platform.height)
 
-		// fmt.Printf("+++++ player x: %d, y: %d, width: %d, height: %d", player.x, player.y, player.width, player.height)
-		// fmt.Printf("----- platform x: %d, y: %d, width: %d, height: %d", platform.x, platform.y, platform.width, platform.height)
+		verticalOverlap := (math.Abs(float64(player.baseCollider.y)-float64(platform.baseCollider.y)) < float64(player.height))
 
-		if player.baseCollider.x < (platform.baseCollider.x+platform.width) &&
-			(player.baseCollider.x+player.width) > platform.baseCollider.x &&
-			player.baseCollider.y < (platform.baseCollider.y+platform.height) &&
-			(player.baseCollider.y+player.height) > platform.baseCollider.y {
-			// fmt.Printf("IT COLLIDES")
-			return true
+		collidableLeft := verticalOverlap && math.Abs(float64(player.baseCollider.x)-float64(platform.baseCollider.x)) < float64(player.width)
+		collidableRight := verticalOverlap && math.Abs(float64(player.baseCollider.x)-float64(platform.baseCollider.x+platform.width)) < float64(player.width)
+
+		if collidableRight {
+			// fmt.Printf("---IT COLLIDES RIGHT")
+			return true, "right"
+		}
+
+		if collidableLeft {
+			// fmt.Printf("---IT COLLIDES left")
+			return true, "left"
 		}
 	}
 
-	return false
+	return false, ""
 }
 
-func (g *Game) drawPlatforms(screen *ebiten.Image, platforms []Platform) {
+func (g *Game) drawPlatforms(screen *ebiten.Image, platforms []Platform, offsetX int, offsetY int) {
 	op := &ebiten.DrawImageOptions{}
 
 	for _, platform := range platforms {
 		for i := 0; i < platform.tileCount; i++ {
 			op.GeoM.Reset()
 			op.GeoM.Translate(float64(platform.baseCollider.x+tileSize*i-g.cameraX), float64(platform.baseCollider.y))
-			screen.DrawImage(tilesImage.SubImage(image.Rect(0, 290, tileSize, 290+tileSize)).(*ebiten.Image), op)
+			screen.DrawImage(tilesImage.SubImage(image.Rect(offsetX, offsetY, offsetX+tileSize, offsetY+tileSize)).(*ebiten.Image), op)
 		}
 	}
 }
@@ -521,8 +512,8 @@ func (g *Game) drawProjectile(screen *ebiten.Image, projectile Projectile) {
 	op := &ebiten.DrawImageOptions{}
 
 	op.GeoM.Reset()
-	op.GeoM.Translate(float64(projectile.baseCollider.x+(g.cameraX-g.x16)/15), float64(projectile.baseCollider.y))
-	screen.DrawImage(tilesImage.SubImage(image.Rect(0, 290, tileSize, 290+tileSize)).(*ebiten.Image), op)
+	op.GeoM.Translate(float64(projectile.baseCollider.x-g.cameraX), float64(projectile.baseCollider.y))
+	screen.DrawImage(bulletImage, op)
 }
 
 func (g *Game) groundTouch() bool {
@@ -531,7 +522,6 @@ func (g *Game) groundTouch() bool {
 
 	y0 := g.y16 + (h-gopherHeight)/2
 	y1 := y0 + gopherHeight
-
 	if y1 >= screenHeight-tileSize {
 		// fmt.Printf("---ground---")
 		return true
@@ -614,11 +604,14 @@ func (g *Game) drawTiles(screen *ebiten.Image) {
 func (g *Game) drawGopher(screen *ebiten.Image) {
 	op := &ebiten.DrawImageOptions{}
 	w, h := gopherImage.Size()
+	if g.movingLeft {
+		flipAsset(gopherImage, op)
+	}
 	op.GeoM.Translate(-float64(w)/2.0, -float64(h)/2.0)
 	op.GeoM.Rotate(float64(g.vy16) / 96.0 * math.Pi / 6)
 	op.GeoM.Translate(float64(w)/2.0, float64(h)/2.0)
 	op.GeoM.Translate(float64(g.x16)-float64(g.cameraX), float64(g.y16)-float64(g.cameraY))
-	op.Filter = ebiten.FilterLinear
+	//op.Filter = ebiten.FilterLinear
 	screen.DrawImage(gopherImage, op)
 }
 
@@ -631,12 +624,11 @@ func (g *Game) drawEnemies(screen *ebiten.Image, enemies []Enemy) {
 		//flip asset
 		flipAsset(enemyImage, op)
 
-		// //place at right bottom, behind the initial screen
-		// op.GeoM.Translate(float64(screenWidth/2 + w * 2), float64(screenHeight - h))
+		//place at right bottom, behind the initial screen
+		// op.GeoM.Translate(float64(screenWidth/2+w*2), float64(screenHeight-h))
 
 		// // make it sit on terain, idk about the division by 3, just works
 		// op.GeoM.Translate(0, -float64(h)/3.0)
-		fmt.Println(enemy.baseCollider.x)
 
 		op.GeoM.Translate(float64(enemy.baseCollider.x-g.cameraX), float64(enemy.baseCollider.y))
 		op.Filter = ebiten.FilterLinear
