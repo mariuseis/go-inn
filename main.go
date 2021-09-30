@@ -187,14 +187,12 @@ type Game struct {
 	gameoverCount int
 	jumpCount int
 
-	touchIDs   []ebiten.TouchID
-	gamepadIDs []ebiten.GamepadID
-
 	audioContext *audio.Context
 	jumpPlayer   *audio.Player
 	hitPlayer    *audio.Player
 
 	platforms []Platform
+	killBoxes []Platform
 }
 
 func NewGame() *Game {
@@ -388,7 +386,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	platformA := Platform{baseCollider: BaseCollider{x: 400, y: 200}, tileCount: 10}
 	platformB := Platform{baseCollider: BaseCollider{x: 320, y: 400}, tileCount: 4}
 	g.platforms = []Platform{platformA, platformB}
-	g.drawPlatforms(screen, g.platforms)
+	g.drawPlatforms(screen, g.platforms, 0, 290)
+
+	killBoxA := Platform{baseCollider: BaseCollider{x: 820, y: 300}, tileCount: 4}
+	g.killBoxes = []Platform{killBoxA}
+	g.drawPlatforms(screen, g.killBoxes, 96, 290)
+
 	if g.mode != ModeTitle {
 		g.drawGopher(screen)
 		g.drawEnemy(screen)
@@ -489,14 +492,14 @@ func (g *Game) hit() bool {
 	return false
 }
 
-func (g *Game) drawPlatforms(screen *ebiten.Image, platforms []Platform){
+func (g *Game) drawPlatforms(screen *ebiten.Image, platforms []Platform, offsetX int, offsetY int){
 	op := &ebiten.DrawImageOptions{}
 
 	for _, platform := range platforms {
 		for i := 0; i < platform.tileCount; i++ {
 			op.GeoM.Reset()
 			op.GeoM.Translate(float64(platform.baseCollider.x + tileSize * i - g.cameraX), float64(platform.baseCollider.y))
-			screen.DrawImage(tilesImage.SubImage(image.Rect(0, 290, tileSize, 290 + tileSize)).(*ebiten.Image), op)
+			screen.DrawImage(tilesImage.SubImage(image.Rect(offsetX, offsetY, offsetX + tileSize, offsetY + tileSize)).(*ebiten.Image), op)
 		}
 	}
 }
