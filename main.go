@@ -168,6 +168,11 @@ type Platform struct {
 	tileCount int
 }
 
+type Projectile struct {
+	lifespan int
+	baseCollider BaseCollider
+}
+
 type Game struct {
 	mode Mode
 
@@ -185,6 +190,7 @@ type Game struct {
 	pipeTileYs []int
 
 	enemyPosition BaseCollider
+	projectiles []Projectile
 
 	gameoverCount int
 	jumpCount int
@@ -268,7 +274,7 @@ func (g *Game) handleMovement() {
 		g.jumpPlayer.Play()
 	}
 
-	if !g.hit() {
+	// if !g.hit() {
 		if (areBothPressed) {
 			g.vx16 = 0;
 		} else if (isLeftPressed) {
@@ -289,10 +295,10 @@ func (g *Game) handleMovement() {
 
 		g.x16 += g.vx16
 		g.y16 += g.vy16
-	} else {
-		g.vx16 = 0
-		g.vy16 = 0
-	}
+	// } else {
+	// 	g.vx16 = 0
+	// 	g.vy16 = 0
+	// }
 }
 
 func (g *Game) isKeyPressed(keys []ebiten.Key) bool{
@@ -332,6 +338,10 @@ func (g *Game) Update() error {
 			g.mode = ModeGameOver
 		}
 
+		if inpututil.IsKeyJustPressed(ebiten.KeyF) {
+			g.projectiles = append(g.projectiles, Projectile{baseCollider: BaseCollider{x: (g.x16/16 + screenWidth / 2), y: screenHeight - 60 - (6160 - g.y16)/16}, lifespan: 100})
+		}
+
 		g.handleMovement()
 
 		// Gravity
@@ -369,7 +379,14 @@ func (g *Game) Update() error {
 func (g *Game) Draw(screen *ebiten.Image) {
 	screen.Fill(color.RGBA{0x80, 0xa0, 0xc0, 0xff}) //background color
 	g.drawTiles(screen)
-	// Platform{tileCount: 10, baseColider: baseColider{x0: 400, y0: 200}}
+	for i := len(g.projectiles)-1; i >= 0; i-- {
+		g.drawProjectile(screen, g.projectiles[i])
+		g.projectiles[i].baseCollider.x += 3
+		g.projectiles[i].lifespan -= 1
+		if (g.projectiles[i].lifespan < 1) {
+			g.projectiles = append(g.projectiles[:i], g.projectiles[i+1:]...)
+		}
+	}
 	platformA := Platform{baseCollider: BaseCollider{x: 400, y: 200}, tileCount: 10}
 	platformB := Platform{baseCollider: BaseCollider{x: 320, y: 400}, tileCount: 4}
 	g.platforms = []Platform{platformA, platformB}
@@ -409,7 +426,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	scoreStr := fmt.Sprintf("%04d", g.score())
 	text.Draw(screen, scoreStr, arcadeFont, screenWidth-len(scoreStr)*fontSize, fontSize, color.White)
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %0.2f", ebiten.CurrentTPS()))
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %0.2f X: %1d Y: %2d VX: %1d VY: %2d", ebiten.CurrentTPS(),  g.x16 / 16,  g.y16 / 16,  g.vx16 ,  g.vy16 ))
 }
 
 func (g *Game) pipeAt(tileX int) (tileY int, ok bool) {
@@ -454,7 +471,7 @@ func (g *Game) hit() bool {
 	for i:=0; i < len(g.platforms); i++ {
 		p := g.platforms[i]
 		// Platform{baseCollider: BaseCollider{x: 400, y: 200}, tileCount: 10}
-		player := Collidable{baseCollider: BaseCollider{x: floorDiv(g.x16, 16), y: floorDiv(g.y16, 16)}, width: gopherWidth, height: gopherHeight}
+		player := Collidable{baseCollider: BaseCollider{x: g.x16, y: floorDiv(g.y16, 16)}, width: gopherWidth, height: gopherHeight}
 		platform := Collidable{baseCollider: BaseCollider{x: p.baseCollider.x, y: p.baseCollider.y},  width: p.tileCount * tileSize, height: tileSize}
 		
 		// y0 := floorDiv(g.y16, 16) + (h-gopherHeight)/2
@@ -484,6 +501,14 @@ func (g *Game) drawPlatforms(screen *ebiten.Image, platforms []Platform){
 			screen.DrawImage(tilesImage.SubImage(image.Rect(0, 290, tileSize, 290 + tileSize)).(*ebiten.Image), op)
 		}
 	}
+}
+
+func (g *Game) drawProjectile(screen *ebiten.Image, projectile Projectile) {
+	op := &ebiten.DrawImageOptions{}
+
+	op.GeoM.Reset()
+	op.GeoM.Translate(float64(projectile.baseCollider.x + (g.cameraX - g.x16)/15), float64(projectile.baseCollider.y))
+	screen.DrawImage(tilesImage.SubImage(image.Rect(0, 290, tileSize, 290 + tileSize)).(*ebiten.Image), op)
 }
 
 func (g *Game) groundTouch() bool {
