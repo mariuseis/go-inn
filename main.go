@@ -403,7 +403,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	scoreStr := fmt.Sprintf("%04d", g.score())
 	text.Draw(screen, scoreStr, arcadeFont, screenWidth-len(scoreStr)*fontSize, fontSize, color.White)
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %0.2f", ebiten.CurrentTPS()))
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %0.2f X: %1d Y: %2d VX: %1d VY: %2d", ebiten.CurrentTPS(),  g.x16 / 16,  g.y16 / 16,  g.vx16 ,  g.vy16 ))
 }
 
 func (g *Game) pipeAt(tileX int) (tileY int, ok bool) {
