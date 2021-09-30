@@ -152,6 +152,13 @@ const (
 	ModeGameOver
 )
 
+type Collidable struct {
+	x int
+	y int
+	width int
+	height int
+}
+
 type Platform struct {
 	x0 int
 	y0 int
@@ -183,6 +190,8 @@ type Game struct {
 	audioContext *audio.Context
 	jumpPlayer   *audio.Player
 	hitPlayer    *audio.Player
+
+	platforms []Platform
 }
 
 func NewGame() *Game {
@@ -241,27 +250,44 @@ func (g *Game) handleMovement() {
 	isRightPressed := g.isKeyPressed([]ebiten.Key{ebiten.KeyD}) || g.isKeyPressed([]ebiten.Key{ebiten.KeyArrowRight})
 	areBothPressed := g.isKeyPressed([]ebiten.Key{ebiten.KeyA, ebiten.KeyD}) || g.isKeyPressed([]ebiten.Key{ebiten.KeyArrowLeft, ebiten.KeyArrowRight})
 
-	if (areBothPressed) {
-		g.vx16 = 0;
-	} else if (isLeftPressed) {
-		g.vx16 -= 10
-		g.cameraX -= 2
-		if(g.vx16 < -32) {
-			g.vx16 = -32
-		}
-	} else if (isRightPressed) {
-		g.vx16 += 10
-		if(g.vx16 > 32) {
-			g.vx16 = 32
-		}
-		fmt.Println(g.vx16, 2.0 * float64(g.vx16) / 32.0, int(math.Round(2.0 * float64(g.vx16) / 32.0)))
-		g.cameraX += int(math.Round(2.0 * float64(g.vx16) / 32.0))
-	} else {
-		g.vx16 = 0;
+	if g.isKeyJustPressed() {
+		// not more than 2 jumps
+		// allow jump from collision/platforms
+		if(g.jumpCount < 2) {
+			g.vy16 = -80
+			g.jumpCount++
+		} else if(g.hit() || g.groundTouch()) {
+			g.jumpCount = 0
+		} 
+		g.jumpPlayer.Rewind()
+		g.jumpPlayer.Play()
 	}
 
-	g.x16 += g.vx16
-	g.y16 += g.vy16
+	if !g.hit() {
+		if (areBothPressed) {
+			g.vx16 = 0;
+		} else if (isLeftPressed) {
+			g.vx16 -= 10
+			g.cameraX -= 2
+			if(g.vx16 < -32) {
+				g.vx16 = -32
+			}
+		} else if (isRightPressed) {
+			g.vx16 += 10
+			g.cameraX += 2
+			if(g.vx16 > 32) {
+				g.vx16 = 32
+			}
+		} else {
+			g.vx16 = 0;
+		}
+
+		g.x16 += g.vx16
+		g.y16 += g.vy16
+	} else {
+		g.vx16 = 0
+		g.vy16 = 0
+	}
 }
 
 func (g *Game) isKeyPressed(keys []ebiten.Key) bool{
@@ -297,21 +323,6 @@ func (g *Game) Update() error {
 			g.mode = ModeGame
 		}
 	case ModeGame:
-		//g.x16 += 32
-		//g.cameraX += 2
-		if g.isKeyJustPressed() {
-			// not more than 2 jumps
-			// allow jump from collision/platforms
-			if(g.jumpCount < 2) {
-				g.vy16 = -80
-				g.jumpCount++
-			} else if(g.hit() || g.groundTouch()) {
-				g.jumpCount = 0
-			} 
-			g.jumpPlayer.Rewind()
-			g.jumpPlayer.Play()
-		}
-
 		if g.isRestartJustPressed(){
 			g.mode = ModeGameOver
 		}
@@ -324,16 +335,16 @@ func (g *Game) Update() error {
 			g.vy16 = 96
 		}
 
-		if g.hit() {
-			// fmt.Printf("it is hit")
-			// g.hitPlayer.Rewind()
-			// g.hitPlayer.Play()
-			//g.mode = ModeGameOver
-			//g.gameoverCount = 30
-			//g.vy16 = 0
-			// g.vx16 = 0
-			// fmt.Print("-----PIPE-----")
-		}
+		// if g.hit() {
+		// 	// fmt.Printf("it is hit")
+		// 	// g.hitPlayer.Rewind()
+		// 	// g.hitPlayer.Play()
+		// 	//g.mode = ModeGameOver
+		// 	//g.gameoverCount = 30
+		// 	//g.vy16 = 0
+		// 	// g.vx16 = 0
+		// 	// fmt.Print("-----COLISSION-----")
+		// } 
 
 		if g.groundTouch() {
 			g.vy16 = 0
@@ -353,8 +364,10 @@ func (g *Game) Update() error {
 func (g *Game) Draw(screen *ebiten.Image) {
 	screen.Fill(color.RGBA{0x80, 0xa0, 0xc0, 0xff}) //background color
 	g.drawTiles(screen)
-	platform := Platform{x0: 400, y0: 200, tileCount: 10}
-	g.drawPlatforms(screen, []Platform{platform})
+	platformA := Platform{x0: 400, y0: 200, tileCount: 10}
+	platformB := Platform{x0: 320, y0: 400, tileCount: 4}
+	g.platforms = []Platform{platformA, platformB}
+	g.drawPlatforms(screen, g.platforms)
 	if g.mode != ModeTitle {
 		g.drawGopher(screen)
 		g.drawEnemy(screen)
@@ -413,41 +426,45 @@ func (g *Game) score() int {
 }
 
 func (g *Game) hit() bool {
-	if g.mode != ModeGame {
-		return false
-	}
+
 	const (
 		gopherWidth  = 30
 		gopherHeight = 60
 	)
-	w, h := gopherImage.Size()
-	x0 := floorDiv(g.x16, 16) + (w-gopherWidth)/2
-	y0 := floorDiv(g.y16, 16) + (h-gopherHeight)/2
-	x1 := x0 + gopherWidth
-	y1 := y0 + gopherHeight
-	if y0 < -tileSize*4 {
-		return true
+
+	// w, h := gopherImage.Size()
+
+	// fmt.Printf("gopher stats HARDCODED w: %d, h: %d", gopherWidth, gopherHeight)
+	// fmt.Printf("gopher stats w: %d, h: %d", w, h)
+
+	// x1 := x0 + gopherWidth
+	// y1 := y0 + gopherHeight
+
+	// wTile, hTile := tilesImage.Size()
+	// x1 := x0 + gopherWidth
+	// y1 := y0 + gopherHeight
+
+
+	for i:=0; i < len(g.platforms); i++ {
+		p := g.platforms[i]
+
+		player := Collidable{floorDiv(g.x16, 16), floorDiv(g.y16, 16), gopherWidth, gopherHeight}
+		platform := Collidable{p.x0, p.y0,  p.tileCount * tileSize, tileSize}
+		
+		// y0 := floorDiv(g.y16, 16) + (h-gopherHeight)/2
+
+		// fmt.Printf("+++++ player x: %d, y: %d, width: %d, height: %d", player.x, player.y, player.width, player.height)
+		// fmt.Printf("----- platform x: %d, y: %d, width: %d, height: %d", platform.x, platform.y, platform.width, platform.height)
+
+		if player.x < (platform.x + platform.width) &&
+			(player.x + player.width) > platform.x &&
+			player.y < (platform.y + platform.height) &&
+			(player.y + player.height) > platform.y {
+				// fmt.Printf("IT COLLIDES")
+			 return true
+		 }
 	}
-	xMin := floorDiv(x0-pipeWidth, tileSize)
-	xMax := floorDiv(x0+gopherWidth, tileSize)
-	for x := xMin; x <= xMax; x++ {
-		y, ok := g.pipeAt(x)
-		if !ok {
-			continue
-		}
-		if x0 >= x*tileSize+pipeWidth {
-			continue
-		}
-		if x1 < x*tileSize {
-			continue
-		}
-		if y0 < y*tileSize {
-			return true
-		}
-		if y1 >= (y+pipeGapY)*tileSize {
-			return true
-		}
-	}
+
 	return false
 }
 
