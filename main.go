@@ -152,16 +152,19 @@ const (
 	ModeGameOver
 )
 
-type Collidable struct {
+type BaseCollider struct {
 	x int
 	y int
+}
+
+type Collidable struct {
+	baseCollider BaseCollider
 	width int
 	height int
 }
 
 type Platform struct {
-	x0 int
-	y0 int
+	baseCollider BaseCollider
 	tileCount int
 }
 
@@ -180,6 +183,8 @@ type Game struct {
 
 	// Pipes
 	pipeTileYs []int
+
+	enemyPosition BaseCollider
 
 	gameoverCount int
 	jumpCount int
@@ -364,8 +369,9 @@ func (g *Game) Update() error {
 func (g *Game) Draw(screen *ebiten.Image) {
 	screen.Fill(color.RGBA{0x80, 0xa0, 0xc0, 0xff}) //background color
 	g.drawTiles(screen)
-	platformA := Platform{x0: 400, y0: 200, tileCount: 10}
-	platformB := Platform{x0: 320, y0: 400, tileCount: 4}
+	// Platform{tileCount: 10, baseColider: baseColider{x0: 400, y0: 200}}
+	platformA := Platform{baseCollider: BaseCollider{x: 400, y: 200}, tileCount: 10}
+	platformB := Platform{baseCollider: BaseCollider{x: 320, y: 400}, tileCount: 4}
 	g.platforms = []Platform{platformA, platformB}
 	g.drawPlatforms(screen, g.platforms)
 	if g.mode != ModeTitle {
@@ -447,19 +453,19 @@ func (g *Game) hit() bool {
 
 	for i:=0; i < len(g.platforms); i++ {
 		p := g.platforms[i]
-
-		player := Collidable{floorDiv(g.x16, 16), floorDiv(g.y16, 16), gopherWidth, gopherHeight}
-		platform := Collidable{p.x0, p.y0,  p.tileCount * tileSize, tileSize}
+		// Platform{baseCollider: BaseCollider{x: 400, y: 200}, tileCount: 10}
+		player := Collidable{baseCollider: BaseCollider{x: floorDiv(g.x16, 16), y: floorDiv(g.y16, 16)}, width: gopherWidth, height: gopherHeight}
+		platform := Collidable{baseCollider: BaseCollider{x: p.baseCollider.x, y: p.baseCollider.y},  width: p.tileCount * tileSize, height: tileSize}
 		
 		// y0 := floorDiv(g.y16, 16) + (h-gopherHeight)/2
 
 		// fmt.Printf("+++++ player x: %d, y: %d, width: %d, height: %d", player.x, player.y, player.width, player.height)
 		// fmt.Printf("----- platform x: %d, y: %d, width: %d, height: %d", platform.x, platform.y, platform.width, platform.height)
 
-		if player.x < (platform.x + platform.width) &&
-			(player.x + player.width) > platform.x &&
-			player.y < (platform.y + platform.height) &&
-			(player.y + player.height) > platform.y {
+		if player.baseCollider.x < (platform.baseCollider.x + platform.width) &&
+			(player.baseCollider.x + player.width) > platform.baseCollider.x &&
+			player.baseCollider.y < (platform.baseCollider.y + platform.height) &&
+			(player.baseCollider.y + player.height) > platform.baseCollider.y {
 				// fmt.Printf("IT COLLIDES")
 			 return true
 		 }
@@ -474,7 +480,7 @@ func (g *Game) drawPlatforms(screen *ebiten.Image, platforms []Platform){
 	for _, platform := range platforms {
 		for i := 0; i < platform.tileCount; i++ {
 			op.GeoM.Reset()
-			op.GeoM.Translate(float64(platform.x0 + tileSize * i + (g.cameraX - g.x16)/16), float64(platform.y0))
+			op.GeoM.Translate(float64(platform.baseCollider.x + tileSize * i + (g.cameraX - g.x16)/16), float64(platform.baseCollider.y))
 			screen.DrawImage(tilesImage.SubImage(image.Rect(0, 290, tileSize, 290 + tileSize)).(*ebiten.Image), op)
 		}
 	}
@@ -493,6 +499,13 @@ func (g *Game) groundTouch() bool {
 	}
 
 	return false
+}
+
+func flipAsset(image *ebiten.Image, op *ebiten.DrawImageOptions) {
+	w, _ := enemyImage.Size()
+
+	op.GeoM.Scale(-1, 1)
+	op.GeoM.Translate(float64(w), 0)
 }
 
 func (g *Game) drawTiles(screen *ebiten.Image) {
@@ -559,14 +572,16 @@ func (g *Game) drawEnemy(screen *ebiten.Image) {
 	op := &ebiten.DrawImageOptions{}
 	w, h := enemyImage.Size()
 
-	x := float64(screenWidth - w)
-	y := float64(screenHeight - h - 20) // draw above ground at the front
+	//flip asset
+	flipAsset(enemyImage, op)
 
-	// fmt.Printf("www = %g, hhh = %g \n", x, y)
-	op.GeoM.Translate(x, y)
-	// op.GeoM.Rotate(float64(g.vy16) / 96.0 * math.Pi / 6)
-	// op.GeoM.Translate(float64(w)/2.0, float64(h)/2.0)
-	// op.GeoM.Translate(float64(g.x16/16.0)-float64(g.cameraX), float64(g.y16/16.0)-float64(g.cameraY))
+	//place at right bottom, behind the initial screen
+	op.GeoM.Translate(float64(screenWidth/2 + w * 2), float64(screenHeight - h))
+
+	// make it sit on terain, idk about the division by 3, just works
+	op.GeoM.Translate(0, -float64(h)/3.0)
+
+	op.GeoM.Translate(float64(g.enemyPosition.x/16.0)-float64(g.cameraX), float64(g.enemyPosition.y/16.0)-float64(g.cameraY))
 	op.Filter = ebiten.FilterLinear
 	screen.DrawImage(enemyImage, op)
 }
