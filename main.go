@@ -448,7 +448,7 @@ func (g *Game) hit() bool {
 	for i:=0; i < len(g.platforms); i++ {
 		p := g.platforms[i]
 
-		player := Collidable{floorDiv(g.x16, 16), floorDiv(g.y16, 16), gopherWidth, gopherHeight}
+		player := Collidable{g.x16, floorDiv(g.y16, 16), gopherWidth, gopherHeight}
 		platform := Collidable{p.x0, p.y0,  p.tileCount * tileSize, tileSize}
 		
 		// y0 := floorDiv(g.y16, 16) + (h-gopherHeight)/2
