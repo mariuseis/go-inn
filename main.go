@@ -263,7 +263,7 @@ func (g *Game) handleMovement() {
 		g.jumpPlayer.Play()
 	}
 
-	if !g.hit() {
+	// if !g.hit() {
 		if (areBothPressed) {
 			g.vx16 = 0;
 		} else if (isLeftPressed) {
@@ -284,10 +284,10 @@ func (g *Game) handleMovement() {
 
 		g.x16 += g.vx16
 		g.y16 += g.vy16
-	} else {
-		g.vx16 = 0
-		g.vy16 = 0
-	}
+	// } else {
+	// 	g.vx16 = 0
+	// 	g.vy16 = 0
+	// }
 }
 
 func (g *Game) isKeyPressed(keys []ebiten.Key) bool{
