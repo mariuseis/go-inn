@@ -275,7 +275,7 @@ func (g *Game) handleMovement() {
 		if g.jumpCount < 2 {
 			g.vy16 = -jumpVelocity * 2
 			g.jumpCount++
-		} else if isHit || g.groundTouch() {
+		} else if isHit || g.groundTouch() || g.hitPlatformTop() {
 			g.jumpCount = 0
 		}
 		g.jumpPlayer.Rewind()
@@ -357,6 +357,10 @@ func (g *Game) Update() error {
 
 		if g.hitKillbox() {
 			g.mode = ModeGameOver
+		}
+
+		if g.hitPlatformTop() {
+			g.vy16 = 0
 		}
 
 		// if g.hit() {
@@ -508,6 +512,21 @@ func (g *Game) hitKillbox() bool {
 	for _, killbox := range g.killBoxes {
 		if(g.x16 + gopherWidth > killbox.baseCollider.x && g.x16 < killbox.baseCollider.x + tileSize * killbox.tileCount) {
 			if(g.y16 < killbox.baseCollider.y + tileSize && g.y16 + gopherHeight > killbox.baseCollider.y) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (g *Game) hitPlatformTop() bool {
+	const (
+		gopherWidth  = 60
+		gopherHeight = 75
+	)
+	for _, killbox := range g.platforms {
+		if(g.x16 + gopherWidth > killbox.baseCollider.x && g.x16 < killbox.baseCollider.x + tileSize * killbox.tileCount) {
+			if(g.y16 + gopherHeight < killbox.baseCollider.y + tileSize && g.y16 + gopherHeight > killbox.baseCollider.y) {
 				return true
 			}
 		}
