@@ -246,12 +246,7 @@ func (g *Game) init() {
 		enemies = append(enemies, enemy)
 	}
 
-	// enemyA := createEnemy()
-	// enemyB := Enemy{baseCollider: BaseCollider{x: 0, y: 150}, vx: 2}
 	g.enemies = enemies
-
-	// fmt.Println(enemies, "enemies")
-	fmt.Println(enemyCount, "enemyCount")
 
 	if g.audioContext == nil {
 		g.audioContext = audio.NewContext(48000)
@@ -404,6 +399,7 @@ func (g *Game) Update() error {
 			g.vy16 = 0
 		}
 	case ModeGameOver:
+		g.hitPlayer.Play()
 		if g.gameoverCount > 0 {
 			g.gameoverCount--
 		}
