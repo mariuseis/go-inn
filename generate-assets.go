@@ -2,7 +2,7 @@
 //go:generate file2byteslice -package=images -input=./images/player.png -output=./images/player.go -var=Player_png
 //go:generate gofmt -s -w .
 
-package resources
+package main
 
 import (
 	// Dummy imports for go.mod for some Go files with 'ignore' tags. For example, `go mod tidy` does not
