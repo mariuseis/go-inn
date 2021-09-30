@@ -32,9 +32,15 @@ import (
 	"golang.org/x/image/font/opentype"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/examples/resources/fonts"
+	
+	
+	"github.com/hajimehoshi/ebiten/v2/audio"
+	"github.com/hajimehoshi/ebiten/v2/audio/wav"
+	"github.com/hajimehoshi/ebiten/v2/audio/vorbis"
+	raudio "github.com/hajimehoshi/ebiten/v2/examples/resources/audio"
+
 	resources "github.com/hajimehoshi/ebiten/v2/examples/resources/images/flappy"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
@@ -196,27 +202,28 @@ func (g *Game) init() {
 	}
 	g.jumpCount = 0
 
-	// if g.audioContext == nil {
-	// 	g.audioContext = audio.NewContext(48000)
-	// }
+	if g.audioContext == nil {
+		g.audioContext = audio.NewContext(48000)
+	}
 
-	// jumpD, err := vorbis.Decode(g.audioContext, bytes.NewReader(raudio.Jump_ogg))
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// g.jumpPlayer, err = g.audioContext.NewPlayer(jumpD)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	jumpD, err := vorbis.Decode(g.audioContext, bytes.NewReader(raudio.Jump_ogg))
+	fmt.Println(jumpD, err);
+	if err != nil {
+		log.Fatal(err)
+	}
+	g.jumpPlayer, err = audio.NewPlayer(g.audioContext, jumpD)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	// jabD, err := wav.Decode(g.audioContext, bytes.NewReader(raudio.Jab_wav))
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// g.hitPlayer, err = g.audioContext.NewPlayer(jabD)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	jabD, err := wav.Decode(g.audioContext, bytes.NewReader(raudio.Jab_wav))
+	if err != nil {
+		log.Fatal(err)
+	}
+	g.hitPlayer, err = audio.NewPlayer(g.audioContext, jabD)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 func (g *Game) isKeyJustPressed() bool {
@@ -244,10 +251,11 @@ func (g *Game) handleMovement() {
 		}
 	} else if (isRightPressed) {
 		g.vx16 += 10
-		g.cameraX += 2
 		if(g.vx16 > 32) {
 			g.vx16 = 32
 		}
+		fmt.Println(g.vx16, 2.0 * float64(g.vx16) / 32.0, int(math.Round(2.0 * float64(g.vx16) / 32.0)))
+		g.cameraX += int(math.Round(2.0 * float64(g.vx16) / 32.0))
 	} else {
 		g.vx16 = 0;
 	}
@@ -300,8 +308,8 @@ func (g *Game) Update() error {
 			} else if(g.hit() || g.groundTouch()) {
 				g.jumpCount = 0
 			} 
-			// g.jumpPlayer.Rewind()
-			// g.jumpPlayer.Play()
+			g.jumpPlayer.Rewind()
+			g.jumpPlayer.Play()
 		}
 
 		if g.isRestartJustPressed(){
@@ -449,7 +457,7 @@ func (g *Game) drawPlatforms(screen *ebiten.Image, platforms []Platform){
 	for _, platform := range platforms {
 		for i := 0; i < platform.tileCount; i++ {
 			op.GeoM.Reset()
-			op.GeoM.Translate(float64(platform.x0 + tileSize * i + (g.cameraX - g.x16)/15), float64(platform.y0))
+			op.GeoM.Translate(float64(platform.x0 + tileSize * i + (g.cameraX - g.x16)/16), float64(platform.y0))
 			screen.DrawImage(tilesImage.SubImage(image.Rect(0, 290, tileSize, 290 + tileSize)).(*ebiten.Image), op)
 		}
 	}
