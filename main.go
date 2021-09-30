@@ -72,6 +72,7 @@ var (
 	tilesImage      *ebiten.Image
 	bulletImage     *ebiten.Image
 	treeImage       *ebiten.Image
+	innImage        *ebiten.Image
 	titleArcadeFont font.Face
 	arcadeFont      font.Face
 	smallArcadeFont font.Face
@@ -112,6 +113,12 @@ func init() {
 		log.Fatal(err)
 	}
 	treeImage = ebiten.NewImageFromImage(img)
+
+	img, _, err = image.Decode(bytes.NewReader(images.Inn_png))
+	if err != nil {
+		log.Fatal(err)
+	}
+	innImage = ebiten.NewImageFromImage(img)
 }
 
 //text font declarations
@@ -391,6 +398,13 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	screen.Fill(color.RGBA{0x80, 0xa0, 0xc0, 0xff}) //background color
+
+	// render inn
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Reset()
+	op.GeoM.Translate(float64(600-g.cameraX), 190) // why 190? idk
+	screen.DrawImage(innImage, op)
+
 	g.drawTiles(screen)
 	for i := len(g.projectiles) - 1; i >= 0; i-- {
 		g.drawProjectile(screen, g.projectiles[i])
