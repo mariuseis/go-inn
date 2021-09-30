@@ -152,6 +152,12 @@ type Platform struct {
 	tileCount int
 }
 
+type Projectile struct {
+	lifespan int
+	x0 int
+	y0 int
+}
+
 type Game struct {
 	mode Mode
 
@@ -167,6 +173,8 @@ type Game struct {
 
 	// Pipes
 	pipeTileYs []int
+
+	projectiles []Projectile
 
 	gameoverCount int
 	jumpCount int
@@ -308,6 +316,10 @@ func (g *Game) Update() error {
 			g.mode = ModeGameOver
 		}
 
+		if inpututil.IsKeyJustPressed(ebiten.KeyF) {
+			g.projectiles = append(g.projectiles, Projectile{x0: (g.x16/16 + screenWidth / 2), y0: screenHeight - 60 - (6160 - g.y16)/16, lifespan: 100})
+		}
+
 		g.handleMovement()
 
 		// Gravity
@@ -347,6 +359,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.drawTiles(screen)
 	platform := Platform{x0: 400, y0: 200, tileCount: 10}
 	g.drawPlatforms(screen, []Platform{platform})
+	for i := len(g.projectiles)-1; i >= 0; i-- {
+		g.drawProjectile(screen, g.projectiles[i])
+		g.projectiles[i].x0 += 3
+		g.projectiles[i].lifespan -= 1
+		if (g.projectiles[i].lifespan < 1) {
+			g.projectiles = append(g.projectiles[:i], g.projectiles[i+1:]...)
+		}
+	}
 	if g.mode != ModeTitle {
 		g.drawGopher(screen)
 		g.drawEnemy(screen)
@@ -453,6 +473,14 @@ func (g *Game) drawPlatforms(screen *ebiten.Image, platforms []Platform){
 			screen.DrawImage(tilesImage.SubImage(image.Rect(0, 290, tileSize, 290 + tileSize)).(*ebiten.Image), op)
 		}
 	}
+}
+
+func (g *Game) drawProjectile(screen *ebiten.Image, projectile Projectile) {
+	op := &ebiten.DrawImageOptions{}
+
+	op.GeoM.Reset()
+	op.GeoM.Translate(float64(projectile.x0 + (g.cameraX - g.x16)/15), float64(projectile.y0))
+	screen.DrawImage(tilesImage.SubImage(image.Rect(0, 290, tileSize, 290 + tileSize)).(*ebiten.Image), op)
 }
 
 func (g *Game) groundTouch() bool {
