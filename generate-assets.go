@@ -1,6 +1,7 @@
 //go:generate file2byteslice -package=images -input=./images/enemy.png -output=./images/enemy.go -var=Enemy_png
 //go:generate file2byteslice -package=images -input=./images/player.png -output=./images/player.go -var=Player_png
 //go:generate file2byteslice -package=images -input=./images/bullet.png -output=./images/bullet.go -var=Bullet_png
+//go:generate file2byteslice -package=images -input=./images/tree.png -output=./images/tree.go -var=Tree_png
 //go:generate gofmt -s -w .
 
 package main

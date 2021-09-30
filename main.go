@@ -71,6 +71,8 @@ var (
 	enemyImage      *ebiten.Image
 	tilesImage      *ebiten.Image
 	bulletImage     *ebiten.Image
+	treeImage       *ebiten.Image
+	innImage        *ebiten.Image
 	titleArcadeFont font.Face
 	arcadeFont      font.Face
 	smallArcadeFont font.Face
@@ -105,6 +107,18 @@ func init() {
 		log.Fatal(err)
 	}
 	bulletImage = ebiten.NewImageFromImage(img)
+
+	img, _, err = image.Decode(bytes.NewReader(images.Tree_png))
+	if err != nil {
+		log.Fatal(err)
+	}
+	treeImage = ebiten.NewImageFromImage(img)
+
+	img, _, err = image.Decode(bytes.NewReader(images.Inn_png))
+	if err != nil {
+		log.Fatal(err)
+	}
+	innImage = ebiten.NewImageFromImage(img)
 }
 
 //text font declarations
@@ -167,6 +181,7 @@ type Platform struct {
 type Enemy struct {
 	baseCollider BaseCollider
 	vx           int
+	isMovingLeft bool
 }
 type Projectile struct {
 	lifespan     int
@@ -188,9 +203,6 @@ type Game struct {
 	// Camera
 	cameraX int
 	cameraY int
-
-	// Pipes
-	pipeTileYs []int
 
 	enemies     []Enemy
 	projectiles []Projectile
@@ -224,10 +236,6 @@ func (g *Game) init() {
 	g.y16 = 100
 	g.cameraX = -240
 	g.cameraY = 0
-	g.pipeTileYs = make([]int, 256)
-	for i := range g.pipeTileYs {
-		g.pipeTileYs[i] = rand.Intn(6) + 2
-	}
 	g.jumpCount = 0
 
 	enemyCount := rand.Intn(8)
@@ -293,7 +301,7 @@ func (g *Game) handleMovement() {
 		if g.jumpCount < 2 {
 			g.vy16 = -jumpVelocity * 2
 			g.jumpCount++
-		} else if isHit || g.groundTouch() {
+		} else if isHit || g.groundTouch() || g.hitPlatformTop() {
 			g.jumpCount = 0
 		}
 		g.jumpPlayer.Rewind()
@@ -373,6 +381,14 @@ func (g *Game) Update() error {
 		g.handleMovement()
 		g.moveEnemies()
 
+		if g.hitKillbox() {
+			g.mode = ModeGameOver
+		}
+
+		if g.hitPlatformTop() {
+			g.vy16 = 0
+		}
+
 		// if g.hit() {
 		// 	// fmt.Printf("it is hit")
 		// 	// g.hitPlayer.Rewind()
@@ -401,6 +417,13 @@ func (g *Game) Update() error {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	screen.Fill(color.RGBA{0x80, 0xa0, 0xc0, 0xff}) //background color
+
+	// render inn
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Reset()
+	op.GeoM.Translate(float64(600-g.cameraX), 190) // why 190? idk
+	screen.DrawImage(innImage, op)
+
 	g.drawTiles(screen)
 	for i := len(g.projectiles) - 1; i >= 0; i-- {
 		g.drawProjectile(screen, g.projectiles[i])
@@ -414,12 +437,13 @@ func (g *Game) Draw(screen *ebiten.Image) {
 			g.projectiles = append(g.projectiles[:i], g.projectiles[i+1:]...)
 		}
 	}
-	platformA := Platform{baseCollider: BaseCollider{x: 400, y: 200}, tileCount: 10}
-	platformB := Platform{baseCollider: BaseCollider{x: 320, y: 400}, tileCount: 4}
+
+	platformA := Platform{baseCollider: BaseCollider{x: 320, y: 400}, tileCount: 4}
+	platformB := Platform{baseCollider: BaseCollider{x: 480, y: 320}, tileCount: 6}
 	g.platforms = []Platform{platformA, platformB}
 	g.drawPlatforms(screen, g.platforms, 0, 290)
 
-	killBoxA := Platform{baseCollider: BaseCollider{x: 820, y: 300}, tileCount: 4}
+	killBoxA := Platform{baseCollider: BaseCollider{x: 440, y: 360}, tileCount: 1}
 	g.killBoxes = []Platform{killBoxA}
 	g.drawPlatforms(screen, g.killBoxes, 96, 290)
 
@@ -447,8 +471,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	if g.mode == ModeTitle {
 		msg := []string{
-			"Go Gopher by Renee French is",
-			"licenced under CC BY 3.0.",
+			"Go INN",
 		}
 		for i, l := range msg {
 			x := (screenWidth - len(l)*smallFontSize) / 2
@@ -459,17 +482,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	scoreStr := fmt.Sprintf("%04d", g.score())
 	text.Draw(screen, scoreStr, arcadeFont, screenWidth-len(scoreStr)*fontSize, fontSize, color.White)
 	ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %0.2f X: %1d Y: %2d VX: %1d VY: %2d", ebiten.CurrentTPS(), g.x16, g.y16, g.vx16, g.vy16))
-}
-
-func (g *Game) pipeAt(tileX int) (tileY int, ok bool) {
-	if (tileX - pipeStartOffsetX) <= 0 {
-		return 0, false
-	}
-	if floorMod(tileX-pipeStartOffsetX, pipeIntervalX) != 0 {
-		return 0, false
-	}
-	idx := floorDiv(tileX-pipeStartOffsetX, pipeIntervalX)
-	return g.pipeTileYs[idx%len(g.pipeTileYs)], true
 }
 
 func (g *Game) score() int {
@@ -514,6 +526,36 @@ func (g *Game) hit() (bool, string) {
 	return false, ""
 }
 
+func (g *Game) hitKillbox() bool {
+	const (
+		gopherWidth  = 60
+		gopherHeight = 75
+	)
+	for _, killbox := range g.killBoxes {
+		if g.x16+gopherWidth > killbox.baseCollider.x && g.x16 < killbox.baseCollider.x+tileSize*killbox.tileCount {
+			if g.y16 < killbox.baseCollider.y+tileSize && g.y16+gopherHeight > killbox.baseCollider.y {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (g *Game) hitPlatformTop() bool {
+	const (
+		gopherWidth  = 60
+		gopherHeight = 75
+	)
+	for _, killbox := range g.platforms {
+		if g.x16+gopherWidth > killbox.baseCollider.x && g.x16 < killbox.baseCollider.x+tileSize*killbox.tileCount {
+			if g.y16+gopherHeight < killbox.baseCollider.y+tileSize && g.y16+gopherHeight > killbox.baseCollider.y {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (g *Game) drawPlatforms(screen *ebiten.Image, platforms []Platform, offsetX int, offsetY int) {
 	op := &ebiten.DrawImageOptions{}
 
@@ -553,7 +595,13 @@ func (g *Game) moveEnemies() {
 	// 	enemy.vx = -2
 	// }
 	for index := range g.enemies {
-		g.enemies[index].baseCollider.x -= 1
+		if g.enemies[index].baseCollider.x > g.x16 {
+			g.enemies[index].baseCollider.x -= 1
+			g.enemies[index].isMovingLeft = true
+		} else {
+			g.enemies[index].isMovingLeft = false
+			g.enemies[index].baseCollider.x += 1
+		}
 	}
 
 	// g.cameraX += g.vx16
@@ -586,36 +634,13 @@ func (g *Game) drawTiles(screen *ebiten.Image) {
 		op.GeoM.Translate(float64(i*tileSize-floorMod(g.cameraX, tileSize)),
 			float64((ny-1)*tileSize-floorMod(g.cameraY, tileSize)))
 		screen.DrawImage(tilesImage.SubImage(image.Rect(0, 0, tileSize, tileSize)).(*ebiten.Image), op)
-
 		// pipe
-		if tileY, ok := g.pipeAt(floorDiv(g.cameraX, tileSize) + i); ok {
-			for j := 0; j < tileY; j++ {
-				op.GeoM.Reset()
-				op.GeoM.Scale(1, -1)
-				op.GeoM.Translate(float64(i*tileSize-floorMod(g.cameraX, tileSize)),
-					float64(j*tileSize-floorMod(g.cameraY, tileSize)))
-				op.GeoM.Translate(0, tileSize)
-				var r image.Rectangle
-				if j == tileY-1 {
-					r = image.Rect(pipeTileSrcX, pipeTileSrcY, pipeTileSrcX+tileSize*2, pipeTileSrcY+tileSize)
-				} else {
-					r = image.Rect(pipeTileSrcX, pipeTileSrcY+tileSize, pipeTileSrcX+tileSize*2, pipeTileSrcY+tileSize*2)
-				}
-				screen.DrawImage(tilesImage.SubImage(r).(*ebiten.Image), op)
-			}
-			for j := tileY + pipeGapY; j < screenHeight/tileSize-1; j++ {
-				op.GeoM.Reset()
-				op.GeoM.Translate(float64(i*tileSize-floorMod(g.cameraX, tileSize)),
-					float64(j*tileSize-floorMod(g.cameraY, tileSize)))
-				var r image.Rectangle
-				if j == tileY+pipeGapY {
-					r = image.Rect(pipeTileSrcX, pipeTileSrcY, pipeTileSrcX+pipeWidth, pipeTileSrcY+tileSize)
-				} else {
-					r = image.Rect(pipeTileSrcX, pipeTileSrcY+tileSize, pipeTileSrcX+pipeWidth, pipeTileSrcY+tileSize+tileSize)
-				}
-				screen.DrawImage(tilesImage.SubImage(r).(*ebiten.Image), op)
-			}
-		}
+		treeHeight := 128
+		approxGroundCoord := 182
+		spacing := 8 * tileSize
+		op.GeoM.Reset()
+		op.GeoM.Translate(float64(spacing*i-floorMod(g.cameraX, spacing)), float64(approxGroundCoord+treeHeight))
+		screen.DrawImage(treeImage, op)
 	}
 }
 
@@ -639,14 +664,10 @@ func (g *Game) drawEnemies(screen *ebiten.Image, enemies []Enemy) {
 
 	for _, enemy := range enemies {
 		op.GeoM.Reset()
-		//flip asset
-		flipAsset(enemyImage, op)
 
-		//place at right bottom, behind the initial screen
-		// op.GeoM.Translate(float64(screenWidth/2+w*2), float64(screenHeight-h))
-
-		// // make it sit on terain, idk about the division by 3, just works
-		// op.GeoM.Translate(0, -float64(h)/3.0)
+		if enemy.isMovingLeft {
+			flipAsset(enemyImage, op)
+		}
 
 		op.GeoM.Translate(float64(enemy.baseCollider.x-g.cameraX), float64(enemy.baseCollider.y))
 		op.Filter = ebiten.FilterLinear
