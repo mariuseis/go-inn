@@ -261,29 +261,30 @@ func (g *Game) handleMovement() {
 
 	g.movingLeft = !areBothPressed && isLeftPressed
 
+	isHit, collidableDirection := g.hit()
+
 	if g.isKeyJustPressed() {
 		// not more than 2 jumps
 		// allow jump from collision/platforms
 		if g.jumpCount < 2 {
 			g.vy16 = -jumpVelocity * 2
 			g.jumpCount++
-		} else if g.hit() || g.groundTouch() {
+		} else if isHit || g.groundTouch() {
 			g.jumpCount = 0
 		}
 		g.jumpPlayer.Rewind()
 		g.jumpPlayer.Play()
 	}
 
-	// if !g.hit() {
 	if areBothPressed {
 		g.vx16 = 0
-	} else if isLeftPressed {
+	} else if isLeftPressed && collidableDirection != "right" {
 		g.vx16 -= moveAcceleration
 		if g.vx16 < -maxMoveVelocity {
 			g.vx16 = -maxMoveVelocity
 		}
 		g.cameraX += g.vx16
-	} else if isRightPressed {
+	} else if isRightPressed && collidableDirection != "left" {
 		g.vx16 += moveAcceleration
 		if g.vx16 > maxMoveVelocity {
 			g.vx16 = maxMoveVelocity
@@ -295,10 +296,12 @@ func (g *Game) handleMovement() {
 
 	g.x16 += g.vx16
 	g.y16 += g.vy16
-	// } else {
-	// 	g.vx16 = 0
-	// 	g.vy16 = 0
-	// }
+
+	// Gravity
+	g.vy16 += gravityAcceleration
+	if g.vy16 > maxGravityVelocity {
+		g.vy16 = maxGravityVelocity
+	}
 }
 
 func (g *Game) isKeyPressed(keys []ebiten.Key) bool {
@@ -344,12 +347,6 @@ func (g *Game) Update() error {
 		}
 
 		g.handleMovement()
-
-		// Gravity
-		g.vy16 += gravityAcceleration
-		if g.vy16 > maxGravityVelocity {
-			g.vy16 = maxGravityVelocity
-		}
 
 		// if g.hit() {
 		// 	// fmt.Printf("it is hit")
@@ -453,46 +450,38 @@ func (g *Game) score() int {
 	return floorDiv(x-pipeStartOffsetX, pipeIntervalX)
 }
 
-func (g *Game) hit() bool {
+func (g *Game) hit() (bool, string) {
 
 	const (
 		gopherWidth  = 30
 		gopherHeight = 60
 	)
 
-	// w, h := gopherImage.Size()
-
-	// fmt.Printf("gopher stats HARDCODED w: %d, h: %d", gopherWidth, gopherHeight)
-	// fmt.Printf("gopher stats w: %d, h: %d", w, h)
-
-	// x1 := x0 + gopherWidth
-	// y1 := y0 + gopherHeight
-
-	// wTile, hTile := tilesImage.Size()
-	// x1 := x0 + gopherWidth
-	// y1 := y0 + gopherHeight
-
 	for i := 0; i < len(g.platforms); i++ {
 		p := g.platforms[i]
-		// Platform{baseCollider: BaseCollider{x: 400, y: 200}, tileCount: 10}
 		player := Collidable{baseCollider: BaseCollider{x: g.x16, y: g.y16}, width: gopherWidth, height: gopherHeight}
 		platform := Collidable{baseCollider: BaseCollider{x: p.baseCollider.x, y: p.baseCollider.y}, width: p.tileCount * tileSize, height: tileSize}
 
-		// y0 := floorDiv(g.y16, 16) + (h-gopherHeight)/2
+		// fmt.Printf("+++++ player x: %d, y: %d, width: %d, height: %d", player.baseCollider.x, player.baseCollider.y, player.width, player.height)
+		// fmt.Printf("----- platform x: %d, y: %d, width: %d, height: %d", platform.baseCollider.x, platform.baseCollider.y, platform.width, platform.height)
 
-		// fmt.Printf("+++++ player x: %d, y: %d, width: %d, height: %d", player.x, player.y, player.width, player.height)
-		// fmt.Printf("----- platform x: %d, y: %d, width: %d, height: %d", platform.x, platform.y, platform.width, platform.height)
+		verticalOverlap := (math.Abs(float64(player.baseCollider.y)-float64(platform.baseCollider.y)) < float64(player.height))
 
-		if player.baseCollider.x < (platform.baseCollider.x+platform.width) &&
-			(player.baseCollider.x+player.width) > platform.baseCollider.x &&
-			player.baseCollider.y < (platform.baseCollider.y+platform.height) &&
-			(player.baseCollider.y+player.height) > platform.baseCollider.y {
-			// fmt.Printf("IT COLLIDES")
-			return true
+		collidableLeft := verticalOverlap && math.Abs(float64(player.baseCollider.x)-float64(platform.baseCollider.x)) < float64(player.width)
+		collidableRight := verticalOverlap && math.Abs(float64(player.baseCollider.x)-float64(platform.baseCollider.x+platform.width)) < float64(player.width)
+
+		if collidableRight {
+			// fmt.Printf("---IT COLLIDES RIGHT")
+			return true, "right"
+		}
+
+		if collidableLeft {
+			// fmt.Printf("---IT COLLIDES left")
+			return true, "left"
 		}
 	}
 
-	return false
+	return false, ""
 }
 
 func (g *Game) drawPlatforms(screen *ebiten.Image, platforms []Platform) {
