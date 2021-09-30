@@ -399,8 +399,8 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	var texts []string
 	switch g.mode {
 	case ModeTitle:
-		titleTexts = []string{"FLAPPY GOPHER"}
-		texts = []string{"", "", "", "", "", "", "", "PRESS SPACE KEY", "", "OR A/B BUTTON", "", "OR TOUCH SCREEN"}
+        titleTexts = []string{"GO INN"}
+        texts = []string{"", "", "", "", "", "", "", "PRESS SPACE KEY"}
 	case ModeGameOver:
 		texts = []string{"", "GAME OVER!"}
 	}
