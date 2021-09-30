@@ -34,17 +34,16 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"github.com/hajimehoshi/ebiten/v2/examples/resources/fonts"
-	
-	
+
 	"github.com/hajimehoshi/ebiten/v2/audio"
-	"github.com/hajimehoshi/ebiten/v2/audio/wav"
 	"github.com/hajimehoshi/ebiten/v2/audio/vorbis"
+	"github.com/hajimehoshi/ebiten/v2/audio/wav"
 	raudio "github.com/hajimehoshi/ebiten/v2/examples/resources/audio"
 
 	resources "github.com/hajimehoshi/ebiten/v2/examples/resources/images/flappy"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
-	
+
 	"github.com/mariuseis/go-inn/images"
 )
 
@@ -76,7 +75,7 @@ const (
 	pipeIntervalX    = 8
 	pipeGapY         = 5
 
-	maxMoveVelocity        = 3
+	maxMoveVelocity     = 3
 	moveAcceleration    = 1
 	gravityAcceleration = 1
 	maxGravityVelocity  = 8
@@ -165,17 +164,22 @@ type BaseCollider struct {
 
 type Collidable struct {
 	baseCollider BaseCollider
-	width int
-	height int
+	width        int
+	height       int
 }
 
 type Platform struct {
 	baseCollider BaseCollider
-	tileCount int
+	tileCount    int
+}
+
+type Enemy struct {
+	baseCollider BaseCollider
+	vx           int
 }
 
 type Projectile struct {
-	lifespan int
+	lifespan     int
 	baseCollider BaseCollider
 }
 
@@ -195,11 +199,11 @@ type Game struct {
 	// Pipes
 	pipeTileYs []int
 
-	enemyPosition BaseCollider
+	enemies     []Enemy
 	projectiles []Projectile
 
 	gameoverCount int
-	jumpCount int
+	jumpCount     int
 
 	touchIDs   []ebiten.TouchID
 	gamepadIDs []ebiten.GamepadID
@@ -219,7 +223,7 @@ func NewGame() *Game {
 
 func (g *Game) init() {
 	g.x16 = 0
-	g.y16 = 100 
+	g.y16 = 100
 	g.cameraX = -240
 	g.cameraY = 0
 	g.pipeTileYs = make([]int, 256)
@@ -228,12 +232,16 @@ func (g *Game) init() {
 	}
 	g.jumpCount = 0
 
+	enemyA := Enemy{baseCollider: BaseCollider{x: 320, y: 400}, vx: 2}
+	enemyB := Enemy{baseCollider: BaseCollider{x: 0, y: 150}, vx: 2}
+	g.enemies = []Enemy{enemyA, enemyB}
+
 	if g.audioContext == nil {
 		g.audioContext = audio.NewContext(48000)
 	}
 
 	jumpD, err := vorbis.Decode(g.audioContext, bytes.NewReader(raudio.Jump_ogg))
-	fmt.Println(jumpD, err);
+	fmt.Println(jumpD, err)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -270,44 +278,44 @@ func (g *Game) handleMovement() {
 	if g.isKeyJustPressed() {
 		// not more than 2 jumps
 		// allow jump from collision/platforms
-		if(g.jumpCount < 2) {
+		if g.jumpCount < 2 {
 			g.vy16 = -jumpVelocity * 2
 			g.jumpCount++
-		} else if(g.hit() || g.groundTouch()) {
+		} else if g.hit() || g.groundTouch() {
 			g.jumpCount = 0
-		} 
+		}
 		g.jumpPlayer.Rewind()
 		g.jumpPlayer.Play()
 	}
 
 	// if !g.hit() {
-		if (areBothPressed) {
-			g.vx16 = 0;
-		} else if (isLeftPressed) {
-			g.vx16 -= moveAcceleration
-			if(g.vx16 < -maxMoveVelocity) {
-				g.vx16 = -maxMoveVelocity
-			}
-			g.cameraX += g.vx16
-		} else if (isRightPressed) {
-			g.vx16 += moveAcceleration
-			if(g.vx16 > maxMoveVelocity) {
-				g.vx16 = maxMoveVelocity
-			}
-			g.cameraX += g.vx16
-		} else {
-			g.vx16 = 0;
+	if areBothPressed {
+		g.vx16 = 0
+	} else if isLeftPressed {
+		g.vx16 -= moveAcceleration
+		if g.vx16 < -maxMoveVelocity {
+			g.vx16 = -maxMoveVelocity
 		}
+		g.cameraX += g.vx16
+	} else if isRightPressed {
+		g.vx16 += moveAcceleration
+		if g.vx16 > maxMoveVelocity {
+			g.vx16 = maxMoveVelocity
+		}
+		g.cameraX += g.vx16
+	} else {
+		g.vx16 = 0
+	}
 
-		g.x16 += g.vx16
-		g.y16 += g.vy16
+	g.x16 += g.vx16
+	g.y16 += g.vy16
 	// } else {
 	// 	g.vx16 = 0
 	// 	g.vy16 = 0
 	// }
 }
 
-func (g *Game) isKeyPressed(keys []ebiten.Key) bool{
+func (g *Game) isKeyPressed(keys []ebiten.Key) bool {
 	keyMap := make(map[ebiten.Key]int)
 	for _, key := range keys {
 		keyMap[key] = -1
@@ -318,9 +326,9 @@ func (g *Game) isKeyPressed(keys []ebiten.Key) bool{
 		}
 	}
 	for _, v := range keyMap {
-		if (v == -1) {
+		if v == -1 {
 			return false
-		} 
+		}
 	}
 	return true
 }
@@ -340,15 +348,16 @@ func (g *Game) Update() error {
 			g.mode = ModeGame
 		}
 	case ModeGame:
-		if g.isRestartJustPressed(){
+		if g.isRestartJustPressed() {
 			g.mode = ModeGameOver
 		}
 
 		if inpututil.IsKeyJustPressed(ebiten.KeyF) {
-			g.projectiles = append(g.projectiles, Projectile{baseCollider: BaseCollider{x: (g.x16 + screenWidth / 2), y: screenHeight - 60 - (6160 - g.y16)}, lifespan: 100})
+			g.projectiles = append(g.projectiles, Projectile{baseCollider: BaseCollider{x: (g.x16 + screenWidth/2), y: screenHeight - 60 - (6160 - g.y16)}, lifespan: 100})
 		}
 
 		g.handleMovement()
+		g.moveEnemies()
 
 		// Gravity
 		g.vy16 += gravityAcceleration
@@ -365,7 +374,7 @@ func (g *Game) Update() error {
 		// 	//g.vy16 = 0
 		// 	// g.vx16 = 0
 		// 	// fmt.Print("-----COLISSION-----")
-		// } 
+		// }
 
 		if g.groundTouch() {
 			g.vy16 = 0
@@ -385,11 +394,11 @@ func (g *Game) Update() error {
 func (g *Game) Draw(screen *ebiten.Image) {
 	screen.Fill(color.RGBA{0x80, 0xa0, 0xc0, 0xff}) //background color
 	g.drawTiles(screen)
-	for i := len(g.projectiles)-1; i >= 0; i-- {
+	for i := len(g.projectiles) - 1; i >= 0; i-- {
 		g.drawProjectile(screen, g.projectiles[i])
 		g.projectiles[i].baseCollider.x += 3
 		g.projectiles[i].lifespan -= 1
-		if (g.projectiles[i].lifespan < 1) {
+		if g.projectiles[i].lifespan < 1 {
 			g.projectiles = append(g.projectiles[:i], g.projectiles[i+1:]...)
 		}
 	}
@@ -399,14 +408,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	g.drawPlatforms(screen, g.platforms)
 	if g.mode != ModeTitle {
 		g.drawGopher(screen)
-		g.drawEnemy(screen)
+		g.drawEnemies(screen, g.enemies)
 	}
 	var titleTexts []string
 	var texts []string
 	switch g.mode {
 	case ModeTitle:
-        titleTexts = []string{"GO INN"}
-        texts = []string{"", "", "", "", "", "", "", "PRESS SPACE KEY"}
+		titleTexts = []string{"GO INN"}
+		texts = []string{"", "", "", "", "", "", "", "PRESS SPACE KEY"}
 	case ModeGameOver:
 		texts = []string{"", "GAME OVER!"}
 	}
@@ -432,7 +441,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 
 	scoreStr := fmt.Sprintf("%04d", g.score())
 	text.Draw(screen, scoreStr, arcadeFont, screenWidth-len(scoreStr)*fontSize, fontSize, color.White)
-	ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %0.2f X: %1d Y: %2d VX: %1d VY: %2d", ebiten.CurrentTPS(),  g.x16 ,  g.y16 ,  g.vx16 ,  g.vy16 ))
+	ebitenutil.DebugPrint(screen, fmt.Sprintf("TPS: %0.2f X: %1d Y: %2d VX: %1d VY: %2d", ebiten.CurrentTPS(), g.x16, g.y16, g.vx16, g.vy16))
 }
 
 func (g *Game) pipeAt(tileX int) (tileY int, ok bool) {
@@ -473,38 +482,37 @@ func (g *Game) hit() bool {
 	// x1 := x0 + gopherWidth
 	// y1 := y0 + gopherHeight
 
-
-	for i:=0; i < len(g.platforms); i++ {
+	for i := 0; i < len(g.platforms); i++ {
 		p := g.platforms[i]
 		// Platform{baseCollider: BaseCollider{x: 400, y: 200}, tileCount: 10}
 		player := Collidable{baseCollider: BaseCollider{x: g.x16, y: g.y16}, width: gopherWidth, height: gopherHeight}
-		platform := Collidable{baseCollider: BaseCollider{x: p.baseCollider.x, y: p.baseCollider.y},  width: p.tileCount * tileSize, height: tileSize}
-		
+		platform := Collidable{baseCollider: BaseCollider{x: p.baseCollider.x, y: p.baseCollider.y}, width: p.tileCount * tileSize, height: tileSize}
+
 		// y0 := floorDiv(g.y16, 16) + (h-gopherHeight)/2
 
 		// fmt.Printf("+++++ player x: %d, y: %d, width: %d, height: %d", player.x, player.y, player.width, player.height)
 		// fmt.Printf("----- platform x: %d, y: %d, width: %d, height: %d", platform.x, platform.y, platform.width, platform.height)
 
-		if player.baseCollider.x < (platform.baseCollider.x + platform.width) &&
-			(player.baseCollider.x + player.width) > platform.baseCollider.x &&
-			player.baseCollider.y < (platform.baseCollider.y + platform.height) &&
-			(player.baseCollider.y + player.height) > platform.baseCollider.y {
-				// fmt.Printf("IT COLLIDES")
-			 return true
-		 }
+		if player.baseCollider.x < (platform.baseCollider.x+platform.width) &&
+			(player.baseCollider.x+player.width) > platform.baseCollider.x &&
+			player.baseCollider.y < (platform.baseCollider.y+platform.height) &&
+			(player.baseCollider.y+player.height) > platform.baseCollider.y {
+			// fmt.Printf("IT COLLIDES")
+			return true
+		}
 	}
 
 	return false
 }
 
-func (g *Game) drawPlatforms(screen *ebiten.Image, platforms []Platform){
+func (g *Game) drawPlatforms(screen *ebiten.Image, platforms []Platform) {
 	op := &ebiten.DrawImageOptions{}
 
 	for _, platform := range platforms {
 		for i := 0; i < platform.tileCount; i++ {
 			op.GeoM.Reset()
-			op.GeoM.Translate(float64(platform.baseCollider.x + tileSize * i - g.cameraX), float64(platform.baseCollider.y))
-			screen.DrawImage(tilesImage.SubImage(image.Rect(0, 290, tileSize, 290 + tileSize)).(*ebiten.Image), op)
+			op.GeoM.Translate(float64(platform.baseCollider.x+tileSize*i-g.cameraX), float64(platform.baseCollider.y))
+			screen.DrawImage(tilesImage.SubImage(image.Rect(0, 290, tileSize, 290+tileSize)).(*ebiten.Image), op)
 		}
 	}
 }
@@ -513,8 +521,8 @@ func (g *Game) drawProjectile(screen *ebiten.Image, projectile Projectile) {
 	op := &ebiten.DrawImageOptions{}
 
 	op.GeoM.Reset()
-	op.GeoM.Translate(float64(projectile.baseCollider.x + (g.cameraX - g.x16)/15), float64(projectile.baseCollider.y))
-	screen.DrawImage(tilesImage.SubImage(image.Rect(0, 290, tileSize, 290 + tileSize)).(*ebiten.Image), op)
+	op.GeoM.Translate(float64(projectile.baseCollider.x+(g.cameraX-g.x16)/15), float64(projectile.baseCollider.y))
+	screen.DrawImage(tilesImage.SubImage(image.Rect(0, 290, tileSize, 290+tileSize)).(*ebiten.Image), op)
 }
 
 func (g *Game) groundTouch() bool {
@@ -529,6 +537,22 @@ func (g *Game) groundTouch() bool {
 		return true
 	}
 	return false
+}
+
+func (g *Game) moveEnemies() {
+	// enemy.vx -= moveAcceleration
+	// if enemy.vx < -2 {
+	// 	enemy.vx = -2
+	// }
+	for index := range g.enemies {
+		g.enemies[index].baseCollider.x -= 1
+	}
+
+	// g.cameraX += g.vx16
+
+	// call on update
+	// reduce value of enemy's x position by 1
+	//will it repaint enemy on gopherDraw?
 }
 
 func flipAsset(image *ebiten.Image, op *ebiten.DrawImageOptions) {
@@ -554,7 +578,7 @@ func (g *Game) drawTiles(screen *ebiten.Image) {
 		op.GeoM.Translate(float64(i*tileSize-floorMod(g.cameraX, tileSize)),
 			float64((ny-1)*tileSize-floorMod(g.cameraY, tileSize)))
 		screen.DrawImage(tilesImage.SubImage(image.Rect(0, 0, tileSize, tileSize)).(*ebiten.Image), op)
-		
+
 		// pipe
 		if tileY, ok := g.pipeAt(floorDiv(g.cameraX, tileSize) + i); ok {
 			for j := 0; j < tileY; j++ {
@@ -598,22 +622,28 @@ func (g *Game) drawGopher(screen *ebiten.Image) {
 	screen.DrawImage(gopherImage, op)
 }
 
-func (g *Game) drawEnemy(screen *ebiten.Image) {
+func (g *Game) drawEnemies(screen *ebiten.Image, enemies []Enemy) {
 	op := &ebiten.DrawImageOptions{}
-	w, h := enemyImage.Size()
+	// w, h := enemyImage.Size()
 
-	//flip asset
-	flipAsset(enemyImage, op)
+	for _, enemy := range enemies {
+		op.GeoM.Reset()
+		//flip asset
+		flipAsset(enemyImage, op)
 
-	//place at right bottom, behind the initial screen
-	op.GeoM.Translate(float64(screenWidth/2 + w * 2), float64(screenHeight - h))
+		// //place at right bottom, behind the initial screen
+		// op.GeoM.Translate(float64(screenWidth/2 + w * 2), float64(screenHeight - h))
 
-	// make it sit on terain, idk about the division by 3, just works
-	op.GeoM.Translate(0, -float64(h)/3.0)
+		// // make it sit on terain, idk about the division by 3, just works
+		// op.GeoM.Translate(0, -float64(h)/3.0)
+		fmt.Println(enemy.baseCollider.x)
 
-	op.GeoM.Translate(float64(g.enemyPosition.x)-float64(g.cameraX), float64(g.enemyPosition.y)-float64(g.cameraY))
-	op.Filter = ebiten.FilterLinear
-	screen.DrawImage(enemyImage, op)
+		op.GeoM.Translate(float64(enemy.baseCollider.x-g.cameraX), float64(enemy.baseCollider.y))
+		op.Filter = ebiten.FilterLinear
+		screen.DrawImage(enemyImage, op)
+	}
+
+	//make check for position to approach each other
 }
 
 func main() {
