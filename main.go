@@ -188,6 +188,8 @@ type Game struct {
 	vy16 int
 	vx16 int
 
+	movingLeft bool
+
 	// Camera
 	cameraX int
 	cameraY int
@@ -266,6 +268,8 @@ func (g *Game) handleMovement() {
 	isLeftPressed := g.isKeyPressed([]ebiten.Key{ebiten.KeyA}) || g.isKeyPressed([]ebiten.Key{ebiten.KeyArrowLeft})
 	isRightPressed := g.isKeyPressed([]ebiten.Key{ebiten.KeyD}) || g.isKeyPressed([]ebiten.Key{ebiten.KeyArrowRight})
 	areBothPressed := g.isKeyPressed([]ebiten.Key{ebiten.KeyA, ebiten.KeyD}) || g.isKeyPressed([]ebiten.Key{ebiten.KeyArrowLeft, ebiten.KeyArrowRight})
+
+	g.movingLeft = !areBothPressed && isLeftPressed
 
 	if g.isKeyJustPressed() {
 		// not more than 2 jumps
@@ -590,11 +594,14 @@ func (g *Game) drawTiles(screen *ebiten.Image) {
 func (g *Game) drawGopher(screen *ebiten.Image) {
 	op := &ebiten.DrawImageOptions{}
 	w, h := gopherImage.Size()
+	if (g.movingLeft) {
+		flipAsset(gopherImage, op)
+	}
 	op.GeoM.Translate(-float64(w)/2.0, -float64(h)/2.0)
 	op.GeoM.Rotate(float64(g.vy16) / 96.0 * math.Pi / 6)
 	op.GeoM.Translate(float64(w)/2.0, float64(h)/2.0)
 	op.GeoM.Translate(float64(g.x16)-float64(g.cameraX), float64(g.y16)-float64(g.cameraY))
-	op.Filter = ebiten.FilterLinear
+	//op.Filter = ebiten.FilterLinear
 	screen.DrawImage(gopherImage, op)
 }
 
